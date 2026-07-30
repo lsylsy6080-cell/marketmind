@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "etf:collect": "tsx scripts/run-etf-collector.ts",
+    "intelligence:run": "tsx scripts/run-market-intelligence.ts",
+    "intelligence:dry": "MARKET_INTELLIGENCE_DRY_RUN=true tsx scripts/run-market-intelligence.ts"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +17,7 @@
   "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",
+    "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "openai": "^6.49.0",
     "rss-parser": "^3.13.0"

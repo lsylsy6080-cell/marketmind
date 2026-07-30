@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "etf:collect": "tsx scripts/run-etf-collector.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3"
+  }
+}
