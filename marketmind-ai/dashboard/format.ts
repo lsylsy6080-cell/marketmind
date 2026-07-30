@@ -21,6 +21,12 @@ export function formatPercent(value: number | null | undefined, digits = 0) {
   return `${formatNumber(value, digits)}%`;
 }
 
+
+export function formatPrice(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return "-";
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(Number(value));
+}
+
 export function formatDateTime(value: string | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);
