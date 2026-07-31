@@ -15,6 +15,8 @@ import { ScoreHistoryChart } from "@/dashboard/components/ScoreHistoryChart";
 import { ScoreOverview } from "@/dashboard/components/ScoreOverview";
 import { SignalComposition } from "@/dashboard/components/SignalComposition";
 import { StrategyComparePanel } from "@/dashboard/components/StrategyComparePanel";
+import { CandidateComparisonPanel } from "@/dashboard/components/CandidateComparisonPanel";
+import { getCandidateComparisonData } from "@/dashboard/candidate-comparison-data";
 import { getMarketIntelligenceDashboardData } from "@/dashboard/data";
 import { getPaperTradingData } from "@/dashboard/paper-data";
 import { getStrategyComparisonData } from "@/dashboard/strategy-compare-data";
@@ -22,10 +24,16 @@ import { getStrategyComparisonData } from "@/dashboard/strategy-compare-data";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [marketData, dashboardData, strategyComparison] = await Promise.all([
+  const [
+    marketData,
+    dashboardData,
+    strategyComparison,
+    candidateComparison,
+  ] = await Promise.all([
     getMarketIntelligenceDashboardData(),
     getPaperTradingData(),
     getStrategyComparisonData(),
+    getCandidateComparisonData(),
   ]);
   const latestDecision = dashboardData.decisions[0] ?? null;
   const chronologicalDecisions = [...dashboardData.decisions].reverse();
@@ -114,14 +122,15 @@ export default async function HomePage() {
 
         <PaperTradingSummary data={dashboardData} />
         <StrategyComparePanel data={strategyComparison} />
+        <CandidateComparisonPanel data={candidateComparison} />
 
         {dashboardData.decisions.length > 0 ? (
           <RecentDecisions decisions={dashboardData.decisions.slice(0, 10)} />
         ) : null}
 
         <footer className="terminal-footer">
-          <span>MarketMind AI · Dashboard Phase 4</span>
-          <span>Decision · Paper Trading · Backtest · Performance</span>
+          <span>MarketMind AI · Dashboard Phase 5-2</span>
+          <span>Decision · Paper Trading · Backtest · Strategy Candidates</span>
         </footer>
       </div>
     </main>

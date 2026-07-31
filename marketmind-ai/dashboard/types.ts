@@ -329,3 +329,35 @@ export type StrategyComparisonData = {
   rows: StrategyComparisonRow[];
   error: string | null;
 };
+
+export type CandidateComparisonRow = {
+  id: number;
+  comparison_run_id: string;
+  candidate_key: string;
+  candidate_name: string;
+  candidate_kind: "conservative" | "balanced" | "aggressive";
+  symbol: string;
+  long_score_min: number;
+  short_score_max: number;
+  confidence_min: number;
+  position_size_percent: number;
+  source_observation_count: number;
+  selected_trades: number;
+  skipped_observations: number;
+  selection_rate: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate: number | null;
+  expected_return_percent: number | null;
+  cumulative_return_percent: number;
+  profit_factor: number | null;
+  max_drawdown_percent: number;
+  sample_status: "insufficient" | "provisional" | "ready";
+  optimization_eligible: boolean;
+  analyzed_at: string;
+};
+
+export type CandidateComparisonData = {
+  rows: CandidateComparisonRow[];
+  error: string | null;
+};

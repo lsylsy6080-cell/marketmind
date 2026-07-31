@@ -84,7 +84,7 @@
   gap: 8px;
   margin-bottom: 12px;
   color: #a88aff;
-  font-size: 11px;
+  font-size:13px;
   font-weight: 800;
   letter-spacing: 0.16em;
 }
@@ -113,7 +113,7 @@
   max-width: 720px;
   margin: 22px 0 0;
   color: var(--pc-muted);
-  font-size: 15px;
+  font-size:16px;
   line-height: 1.8;
 }
 
@@ -146,12 +146,12 @@
 
 .heroStatus span {
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
 }
 
 .heroStatus strong {
   color: #dffcf1;
-  font-size: 14px;
+  font-size:15px;
 }
 
 .heroStats {
@@ -176,7 +176,7 @@
 
 .heroStats span {
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
 }
 
 .heroStats strong {
@@ -185,7 +185,7 @@
 
 .heroStats small {
   color: var(--pc-soft);
-  font-size: 11px;
+  font-size:13px;
 }
 
 .primaryGrid {
@@ -269,7 +269,7 @@
   border-radius: 999px;
   color: #cbb9ff;
   background: rgba(139, 92, 246, 0.09);
-  font-size: 11px;
+  font-size:13px;
   font-weight: 800;
 }
 
@@ -329,7 +329,7 @@
 
 .scoreGaugeValue span {
   color: var(--pc-muted);
-  font-size: 14px;
+  font-size:15px;
 }
 
 .scoreDetails {
@@ -349,7 +349,7 @@
   gap: 7px;
   padding: 7px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size:13px;
   font-weight: 800;
 }
 
@@ -378,14 +378,14 @@
 
 .scorePhase {
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
 }
 
 .scoreStars {
   display: flex;
   gap: 3px;
   margin-top: 16px;
-  font-size: 15px;
+  font-size:16px;
 }
 
 .scoreStarActive {
@@ -400,7 +400,7 @@
 .scoreDescription {
   margin: 13px 0 18px;
   color: var(--pc-muted);
-  font-size: 13px;
+  font-size:14px;
   line-height: 1.65;
 }
 
@@ -409,7 +409,7 @@
   justify-content: space-between;
   margin-bottom: 8px;
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
 }
 
 .scoreProgressMeta strong {
@@ -452,12 +452,12 @@
 
 .scoreFooter span {
   color: var(--pc-soft);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .scoreFooter strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size:13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -501,14 +501,14 @@
 .serviceIdentity strong {
   display: block;
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size:14px;
 }
 
 .serviceIdentity p {
   overflow: hidden;
   margin: 0;
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -551,11 +551,11 @@
 
 .serviceState span {
   color: var(--pc-soft);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .serviceState strong {
-  font-size: 11px;
+  font-size:13px;
 }
 
 .statusFooter {
@@ -566,7 +566,7 @@
   padding-top: 16px;
   border-top: 1px solid var(--pc-line);
   color: var(--pc-soft);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .statusFooter .liveIndicator {
@@ -583,7 +583,7 @@
 
 .averageProgress span {
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
 }
 
 .averageProgress strong {
@@ -606,13 +606,13 @@
 }
 
 .progressItemHeader strong {
-  font-size: 13px;
+  font-size:14px;
 }
 
 .progressItemHeader p {
   margin: 4px 0 0;
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .progressValue {
@@ -624,13 +624,13 @@
 
 .progressValue span {
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .progressValue strong {
   min-width: 38px;
   text-align: right;
-  font-size: 13px;
+  font-size:14px;
 }
 
 .progressExcellent {
@@ -665,7 +665,7 @@
   max-width: 520px;
   margin: 0;
   color: var(--pc-muted);
-  font-size: 12px;
+  font-size:14px;
   line-height: 1.65;
   text-align: right;
 }
@@ -724,7 +724,7 @@
   border-radius: 999px;
   color: #b9a1ff;
   background: rgba(139, 92, 246, 0.07);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .focusCard h3 {
@@ -735,7 +735,7 @@
 .focusCard p {
   margin: 0;
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
   line-height: 1.7;
 }
 
@@ -888,7 +888,7 @@
   border-radius: 10px;
   background: rgba(8, 10, 19, 0.55);
   color: #a88aff;
-  font-size: 11px;
+  font-size:13px;
 }
 
 .heroCommand code {
@@ -898,7 +898,7 @@
 
 .heroStatus small {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .remasterGrid {
@@ -948,7 +948,7 @@
   gap: 7px;
   padding: 7px 10px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size:12px;
   font-weight: 900;
   letter-spacing: 0.08em;
 }
@@ -1021,7 +1021,7 @@
   display: block;
   margin-bottom: 4px;
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .aiRecommendationHeader h3 {
@@ -1033,7 +1033,7 @@
 .aiRecommendationDescription {
   margin: 20px 0;
   color: var(--pc-muted);
-  font-size: 12px;
+  font-size:14px;
   line-height: 1.75;
 }
 
@@ -1055,12 +1055,12 @@
 .confidenceHeader span,
 .releaseProgressHeader span {
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
 }
 
 .confidenceHeader strong {
   color: #d9ccff;
-  font-size: 15px;
+  font-size:16px;
 }
 
 .confidenceTrack,
@@ -1098,11 +1098,11 @@
 
 .aiMetrics span {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .aiMetrics strong {
-  font-size: 13px;
+  font-size:14px;
 }
 
 .aiChecklist {
@@ -1113,7 +1113,7 @@
 
 .checklistTitle {
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
   font-weight: 700;
 }
 
@@ -1141,14 +1141,14 @@
   border-radius: 8px;
   color: #bda9ff;
   background: rgba(139, 92, 246, 0.055);
-  font-size: 9px;
+  font-size:11px;
   font-weight: 900;
 }
 
 .aiChecklist p {
   margin: 0;
   color: #b5bdce;
-  font-size: 11px;
+  font-size:13px;
   line-height: 1.5;
 }
 
@@ -1230,20 +1230,20 @@
   display: block;
   margin-bottom: 3px;
   color: #a991f1;
-  font-size: 10px;
+  font-size:12px;
   font-weight: 900;
 }
 
 .releaseTop h3 {
   margin: 0;
-  font-size: 13px;
+  font-size:14px;
 }
 
 .releaseStage {
   flex: 0 0 auto;
   padding: 5px 8px;
   border-radius: 999px;
-  font-size: 9px;
+  font-size:11px;
   font-weight: 800;
 }
 
@@ -1265,13 +1265,13 @@
 .releaseContent > p {
   margin: 7px 0 12px;
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
   line-height: 1.55;
 }
 
 .releaseProgressHeader strong {
   color: #aeb8ca;
-  font-size: 10px;
+  font-size:12px;
 }
 
 .releaseProgressTrack > span {
@@ -1335,7 +1335,7 @@
 .activityItem time {
   color: var(--pc-soft);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 9px;
+  font-size:11px;
 }
 
 .activityDot {
@@ -1360,21 +1360,21 @@
 
 .activityContent strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size:13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .activityContent span {
   flex: 0 0 auto;
-  font-size: 9px;
+  font-size:11px;
   font-weight: 800;
 }
 
 .activityContent p {
   margin: 10px 0 0;
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
   line-height: 1.55;
 }
 
@@ -1397,7 +1397,7 @@
 .activityFooter {
   margin: 18px 28px 24px;
   color: var(--pc-soft);
-  font-size: 10px;
+  font-size:12px;
 }
 
 @keyframes aiOrbSpin {
@@ -1514,7 +1514,7 @@
   gap: 7px;
   padding: 7px 10px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size:12px;
   font-weight: 900;
 }
 
@@ -1545,14 +1545,14 @@
 
 .gitRepositoryMeta span {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
   font-weight: 800;
   letter-spacing: 0.12em;
 }
 
 .gitRepositoryMeta strong {
   overflow: hidden;
-  font-size: 12px;
+  font-size:14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1615,13 +1615,13 @@
 
 .gitCommitTop code {
   color: #b9a4ff;
-  font-size: 10px;
+  font-size:12px;
 }
 
 .gitCommitTop time,
 .gitCommitFooter span {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .gitCommitContent > strong {
@@ -1629,7 +1629,7 @@
   overflow: hidden;
   margin: 7px 0 8px;
   color: #dce1ec;
-  font-size: 12px;
+  font-size:14px;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1638,7 +1638,7 @@
 .gitCommitFooter a,
 .environmentState a {
   color: #8fc4ff;
-  font-size: 9px;
+  font-size:11px;
   text-decoration: none;
 }
 
@@ -1660,14 +1660,14 @@
 
 .gitEmptyState strong,
 .buildEmptyState strong {
-  font-size: 13px;
+  font-size:14px;
 }
 
 .gitEmptyState p,
 .buildEmptyState p {
   margin: 8px 0 0;
   color: var(--pc-muted);
-  font-size: 10px;
+  font-size:12px;
   line-height: 1.6;
 }
 
@@ -1728,14 +1728,14 @@
 
 .buildHero span {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
 
 .buildHero strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size:14px;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1744,7 +1744,7 @@
 .buildHero small,
 .buildIdentity code {
   color: var(--pc-muted);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .buildIdentity {
@@ -1783,14 +1783,14 @@
 .environmentIdentity strong {
   display: block;
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size:14px;
 }
 
 .environmentIdentity p {
   overflow: hidden;
   margin: 0;
   color: var(--pc-muted);
-  font-size: 9px;
+  font-size:11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1804,11 +1804,11 @@
 
 .environmentState > span {
   color: var(--pc-soft);
-  font-size: 8px;
+  font-size:11px;
 }
 
 .environmentState strong {
-  font-size: 9px;
+  font-size:11px;
 }
 
 @media (max-width: 980px) {
@@ -1876,7 +1876,7 @@
   gap: 7px;
   padding: 8px 11px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size:12px;
   font-weight: 900;
   letter-spacing: 0.1em;
 }
@@ -1943,7 +1943,7 @@
 
 .decisionHeadline > div:last-child > span {
   color: var(--pc-soft);
-  font-size: 10px;
+  font-size:12px;
   font-weight: 800;
   letter-spacing: 0.09em;
 }
@@ -1957,7 +1957,7 @@
 .decisionHeadline p {
   margin: 0;
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
   line-height: 1.7;
 }
 
@@ -1979,7 +1979,7 @@
 .decisionMetricGrid span {
   display: block;
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .decisionMetricGrid strong {
@@ -2024,13 +2024,13 @@
 }
 
 .decisionSectionTitle span {
-  font-size: 11px;
+  font-size:13px;
   font-weight: 800;
 }
 
 .decisionSectionTitle small {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .factorGrid {
@@ -2079,7 +2079,7 @@
 
 .factorTop strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size:13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2088,13 +2088,13 @@
   flex: 0 0 auto;
   color: #cbbcff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
+  font-size:12px;
 }
 
 .factorItem p {
   margin: 9px 0 0;
   color: var(--pc-muted);
-  font-size: 9px;
+  font-size:11px;
   line-height: 1.55;
 }
 
@@ -2106,7 +2106,7 @@
   padding-top: 15px;
   border-top: 1px solid var(--pc-line);
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .decisionEmptyState,
@@ -2120,13 +2120,13 @@
 .decisionHistoryEmpty p {
   margin: 0;
   color: var(--pc-muted);
-  font-size: 11px;
+  font-size:13px;
   line-height: 1.6;
 }
 
 .decisionEmptyState small {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .decisionHistoryList {
@@ -2193,13 +2193,13 @@
 }
 
 .decisionHistoryTop strong {
-  font-size: 12px;
+  font-size:14px;
 }
 
 .decisionHistoryTop span,
 .decisionHistoryTop time {
   color: var(--pc-soft);
-  font-size: 9px;
+  font-size:11px;
 }
 
 .decisionHistoryMeta {
@@ -2213,7 +2213,7 @@
   border-radius: 999px;
   color: var(--pc-muted);
   background: rgba(148, 163, 184, 0.055);
-  font-size: 8px;
+  font-size:11px;
 }
 
 .historySignal {
@@ -2227,7 +2227,7 @@
 .decisionHistoryContent p {
   margin: 9px 0 0;
   color: var(--pc-muted);
-  font-size: 9px;
+  font-size:11px;
   line-height: 1.55;
 }
 
@@ -2275,11 +2275,11 @@
   border-radius: 12px;
   background: rgba(139, 92, 246, 0.035);
 }
-.brainStatusGrid span { display: block; color: var(--pc-soft); font-size: 9px; }
-.brainStatusGrid strong { display: block; overflow: hidden; margin-top: 6px; color: #d9d0ff; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.brainStatusGrid span { display: block; color: var(--pc-soft); font-size:11px; }
+.brainStatusGrid strong { display: block; overflow: hidden; margin-top: 6px; color: #d9d0ff; font-size:13px; text-overflow: ellipsis; white-space: nowrap; }
 .factorWeight { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
-.factorWeight > span { color: var(--pc-soft); font-size: 8px; }
-.factorWeight > strong { color: #bba8ff; font-size: 9px; }
+.factorWeight > span { color: var(--pc-soft); font-size:11px; }
+.factorWeight > strong { color: #bba8ff; font-size:11px; }
 .factorWeight > div { grid-column: 1 / -1; overflow: hidden; height: 4px; border-radius: 999px; background: rgba(148, 163, 184, 0.09); }
 .factorWeight > div > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7046df, #43d5a1); }
 @media (max-width: 620px) { .brainStatusGrid { grid-template-columns: 1fr; } }
@@ -2291,7 +2291,7 @@
 }
 
 .cardEyebrow,
-.heroEyebrow { font-size: 13px; }
+.heroEyebrow { font-size:14px; }
 .cardHeader { padding: 30px 32px 0; }
 .cardHeader h2,
 .sectionHeading h2 { font-size: 22px; }
@@ -2306,7 +2306,7 @@
 .decisionSignalBadge,
 .decisionUnavailable {
   padding: 10px 15px;
-  font-size: 13px;
+  font-size:14px;
 }
 
 .decisionHero {
@@ -2332,7 +2332,7 @@
 }
 .decisionSignalWord > span {
   color: var(--pc-soft);
-  font-size: 13px;
+  font-size:14px;
   font-weight: 800;
   letter-spacing: .1em;
 }
@@ -2365,7 +2365,7 @@
 }
 .decisionHeroMetrics span {
   color: var(--pc-soft);
-  font-size: 12px;
+  font-size:14px;
   font-weight: 850;
   letter-spacing: .09em;
 }
@@ -2385,7 +2385,7 @@
   border-radius: 0 12px 12px 0;
   color: #c1c7d5;
   background: rgba(139,92,246,.045);
-  font-size: 15px;
+  font-size:16px;
   line-height: 1.75;
 }
 
@@ -2395,28 +2395,28 @@
   margin-top: 14px;
 }
 .decisionMetricGrid > div { padding: 18px 20px; }
-.decisionMetricGrid span { font-size: 12px; }
+.decisionMetricGrid span { font-size:14px; }
 .decisionMetricGrid strong { margin-top: 8px; font-size: 24px; }
 
 .brainStatusGrid { gap: 12px; margin-top: 12px; }
 .brainStatusGrid > div { padding: 17px 18px; }
-.brainStatusGrid span { font-size: 11px; }
-.brainStatusGrid strong { margin-top: 8px; font-size: 15px; }
+.brainStatusGrid span { font-size:13px; }
+.brainStatusGrid strong { margin-top: 8px; font-size:16px; }
 
 .decisionFactors { margin-top: 26px; padding-top: 24px; }
 .decisionSectionTitle { margin-bottom: 16px; }
-.decisionSectionTitle span { font-size: 15px; }
-.decisionSectionTitle small { font-size: 12px; }
+.decisionSectionTitle span { font-size:16px; }
+.decisionSectionTitle small { font-size:14px; }
 .factorGrid { gap: 12px; }
 .factorItem { padding: 18px; border-radius: 15px; }
-.factorTop strong { font-size: 15px; }
-.factorTop > span { font-size: 15px; font-weight: 800; }
+.factorTop strong { font-size:16px; }
+.factorTop > span { font-size:16px; font-weight: 800; }
 .factorTop i { width: 9px; height: 9px; }
-.factorItem p { margin-top: 12px; font-size: 12px; line-height: 1.65; }
-.factorWeight > span { font-size: 11px; }
-.factorWeight > strong { font-size: 12px; }
+.factorItem p { margin-top: 12px; font-size:14px; line-height: 1.65; }
+.factorWeight > span { font-size:13px; }
+.factorWeight > strong { font-size:14px; }
 .factorWeight > div { height: 6px; }
-.decisionFooter { margin-top: 24px; padding-top: 18px; font-size: 11px; }
+.decisionFooter { margin-top: 24px; padding-top: 18px; font-size:13px; }
 
 .decisionHistoryList { padding: 28px 32px 34px; }
 .decisionHistoryItem { grid-template-columns: 26px minmax(0,1fr); gap: 14px; }
@@ -2424,14 +2424,14 @@
 .decisionHistoryContent { padding-bottom: 28px; }
 .decisionHistoryTop strong { font-size: 16px; }
 .decisionHistoryTop span,
-.decisionHistoryTop time { font-size: 12px; }
+.decisionHistoryTop time { font-size:14px; }
 .decisionHistoryMeta { gap: 8px; margin-top: 10px; }
-.decisionHistoryMeta > span { padding: 6px 9px; font-size: 11px; }
-.decisionHistoryContent p { margin-top: 11px; font-size: 12px; line-height: 1.65; }
-.timelineCount { font-size: 11px; }
+.decisionHistoryMeta > span { padding: 6px 9px; font-size:13px; }
+.decisionHistoryContent p { margin-top: 11px; font-size:14px; line-height: 1.65; }
+.timelineCount { font-size:13px; }
 
 /* Raise tiny text throughout Project Center without changing layout semantics. */
-.projectCenter :where(small) { font-size: max(11px, .72em); }
+.projectCenter :where(small) { font-size:max(13px, .72em); }
 
 @media (max-width: 1180px) {
   .aiDecisionGrid { grid-template-columns: 1fr; }

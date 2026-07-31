@@ -1,19 +1,19 @@
 {
   "project": {
     "name": "MarketMind AI",
-    "version": "4.0.0",
-    "phase": "Phase 4 Dashboard Complete",
-    "updatedAt": "2026-07-31T15:30:00+09:00"
+    "version": "5.2.0",
+    "phase": "Phase 5-2 Candidate Comparison",
+    "updatedAt": "2026-07-31T16:10:00+09:00"
   },
   "summary": {
-    "score": 93,
+    "score": 94,
     "health": "healthy",
-    "overallProgress": 84,
+    "overallProgress": 88,
     "buildStatus": "ready"
   },
   "focus": {
-    "title": "Phase 5 Strategy Optimization",
-    "description": "Phase 2 의사결정, Phase 3 모의투자, Phase 4 대시보드 결과를 바탕으로 전략별 성과를 최적화합니다.",
+    "title": "Phase 5-2 Candidate Comparison",
+    "description": "보수형·균형형·공격형 후보의 점수·신뢰도·포지션 크기를 동일한 24시간 Backtest 표본으로 비교합니다.",
     "impact": "매우 높음",
     "estimatedTime": "단계별 검증 진행"
   },
@@ -21,7 +21,7 @@
     { "id": "data", "label": "Data Collection", "value": 92 },
     { "id": "intelligence", "label": "Market Intelligence", "value": 94 },
     { "id": "dashboard", "label": "Dashboard", "value": 100 },
-    { "id": "backtest", "label": "Backtest", "value": 82 },
+    { "id": "backtest", "label": "Backtest", "value": 88 },
     { "id": "paper-trading", "label": "Paper Trading", "value": 100 },
     { "id": "execution", "label": "Execution", "value": 12 }
   ]
