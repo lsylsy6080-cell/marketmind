@@ -1,0 +1,46 @@
+{
+  "project": "MarketMind AI",
+  "version": "5.0.0",
+  "updatedAt": "2026-07-31",
+  "summary": "시장 데이터 수집, Market Intelligence v2.1, 웹 대시보드, 모의 트레이딩 분리를 완료하고 AI Decision Engine 단계로 진입합니다.",
+  "areas": [
+    {"id":"data","name":"데이터 수집","progress":96},
+    {"id":"intelligence","name":"AI 분석 엔진","progress":90},
+    {"id":"validation","name":"검증 시스템","progress":82},
+    {"id":"dashboard","name":"웹 대시보드","progress":88},
+    {"id":"live","name":"실거래 준비","progress":25},
+    {"id":"automation","name":"자동매매","progress":15}
+  ],
+  "tasks": [
+    {"id":"binance-candles","name":"바이낸스 캔들 수집","area":"market-worker","priority":"S","status":"done"},
+    {"id":"technical-indicators","name":"기술지표 계산","area":"indicator","priority":"S","status":"done"},
+    {"id":"funding-intelligence","name":"Funding Intelligence","area":"intelligence","priority":"S","status":"done"},
+    {"id":"news-intelligence","name":"News Intelligence","area":"intelligence","priority":"S","status":"done"},
+    {"id":"etf-intelligence","name":"ETF Intelligence","area":"intelligence","priority":"S","status":"done"},
+    {"id":"market-intelligence-v21","name":"Market Intelligence v2.1","area":"intelligence","priority":"S","status":"done"},
+    {"id":"consensus-engine","name":"Consensus Engine","area":"intelligence","priority":"S","status":"done"},
+    {"id":"breakdown-risk-conflict","name":"Breakdown · Risk · Conflict","area":"intelligence","priority":"S","status":"done"},
+    {"id":"market-dashboard","name":"Market Intelligence 대시보드","area":"marketmind-ai","priority":"S","status":"done"},
+    {"id":"trading-page-split","name":"모의 트레이딩 페이지 분리","area":"marketmind-ai","priority":"S","status":"done"},
+    {"id":"paper-trading","name":"Paper Trading 고도화","area":"paper-trading","priority":"S","status":"doing"},
+    {"id":"decision-engine","name":"AI Decision Engine","area":"ai-engine","priority":"S","status":"next"},
+    {"id":"fear-greed","name":"Fear & Greed 연동","area":"collector","priority":"A","status":"todo"},
+    {"id":"open-interest","name":"Open Interest 고도화","area":"collector","priority":"A","status":"todo"},
+    {"id":"liquidation","name":"Liquidation 데이터","area":"collector","priority":"A","status":"todo"},
+    {"id":"stablecoin-flow","name":"Stablecoin Flow","area":"collector","priority":"B","status":"todo"},
+    {"id":"whale-wallet","name":"고래 지갑 분석","area":"collector","priority":"B","status":"todo"},
+    {"id":"performance","name":"성과·MDD·워크포워드 검증","area":"analytics","priority":"S","status":"todo"},
+    {"id":"small-live","name":"소액 실거래 검증","area":"execution","priority":"B","status":"todo"},
+    {"id":"auto-trading","name":"자동매매 시스템","area":"execution","priority":"C","status":"todo"}
+  ],
+  "timeline": [
+    {"date":"2026-07-29","title":"ETF Intelligence 완료"},
+    {"date":"2026-07-30","title":"Market Intelligence v2.1 검증 완료"},
+    {"date":"2026-07-31","title":"대시보드와 모의 트레이딩 페이지 분리"}
+  ],
+  "commitRules": {
+    "done": "[done:task-id]",
+    "doing": "[doing:task-id]",
+    "next": "[next:task-id]"
+  }
+}

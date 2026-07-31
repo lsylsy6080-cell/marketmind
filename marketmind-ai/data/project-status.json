@@ -1,0 +1,28 @@
+{
+  "project": {
+    "name": "MarketMind AI",
+    "version": "1.0.0",
+    "phase": "Project Center Phase 1",
+    "updatedAt": "2026-07-31T10:00:00+09:00"
+  },
+  "summary": {
+    "score": 86,
+    "health": "healthy",
+    "overallProgress": 72,
+    "buildStatus": "ready"
+  },
+  "focus": {
+    "title": "AI Decision Engine",
+    "description": "Market Intelligence 결과를 실제 의사결정 신호로 변환하는 다음 핵심 단계입니다.",
+    "impact": "매우 높음",
+    "estimatedTime": "약 4~6시간"
+  },
+  "progress": [
+    { "id": "data", "label": "Data Collection", "value": 92 },
+    { "id": "intelligence", "label": "Market Intelligence", "value": 88 },
+    { "id": "dashboard", "label": "Dashboard", "value": 82 },
+    { "id": "backtest", "label": "Backtest", "value": 58 },
+    { "id": "paper-trading", "label": "Paper Trading", "value": 46 },
+    { "id": "execution", "label": "Execution", "value": 12 }
+  ]
+}
