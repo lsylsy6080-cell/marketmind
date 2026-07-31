@@ -23,6 +23,8 @@ import { StrategyRecommendationPanel } from "@/dashboard/components/StrategyReco
 import { getStrategyRecommendationData } from "@/dashboard/recommendation-data";
 import { OptimizationStatusPanel } from "@/dashboard/components/OptimizationStatusPanel";
 import { getOptimizationStatusData } from "@/dashboard/optimization-status-data";
+import { WorkerOperationsPanel } from "@/dashboard/components/WorkerOperationsPanel";
+import { getWorkerOperationsData } from "@/dashboard/worker-operations-data";
 import { getMarketIntelligenceDashboardData } from "@/dashboard/data";
 import { getPaperTradingData } from "@/dashboard/paper-data";
 import { getStrategyComparisonData } from "@/dashboard/strategy-compare-data";
@@ -38,6 +40,7 @@ export default async function HomePage() {
     strategyValidation,
     strategyRecommendation,
     optimizationStatus,
+    workerOperations,
   ] = await Promise.all([
     getMarketIntelligenceDashboardData(),
     getPaperTradingData(),
@@ -46,6 +49,7 @@ export default async function HomePage() {
     getStrategyValidationData(),
     getStrategyRecommendationData(),
     getOptimizationStatusData(),
+    getWorkerOperationsData(),
   ]);
   const latestDecision = dashboardData.decisions[0] ?? null;
   const chronologicalDecisions = [...dashboardData.decisions].reverse();
@@ -138,14 +142,15 @@ export default async function HomePage() {
         <StrategyValidationPanel data={strategyValidation} />
         <StrategyRecommendationPanel data={strategyRecommendation} />
         <OptimizationStatusPanel data={optimizationStatus} />
+        <WorkerOperationsPanel data={workerOperations} />
 
         {dashboardData.decisions.length > 0 ? (
           <RecentDecisions decisions={dashboardData.decisions.slice(0, 10)} />
         ) : null}
 
         <footer className="terminal-footer">
-          <span>MarketMind AI · Dashboard Phase 5 Complete</span>
-          <span>Optimization · Validation · Manual Approval Lock</span>
+          <span>MarketMind AI · Operations Automation</span>
+          <span>Paper Trading Only · No Live Trading</span>
         </footer>
       </div>
     </main>

@@ -15,46 +15,57 @@ import { runStrategyCandidateComparison } from "./optimization/run-strategy-cand
 import { runStrategyWalkForwardValidation } from "./optimization/run-strategy-walk-forward-validation";
 import { runStrategyRecommendation } from "./optimization/run-strategy-recommendation";
 import { runOptimizationReadiness } from "./optimization/run-optimization-readiness";
+import { WorkerExecutionTracker } from "./operations/WorkerExecutionTracker";
 
 async function main(): Promise<void> {
-  console.log("BTCUSDT 1분봉 수집을 시작합니다.");
-  const savedCount = await collectBinanceBtcCandles(1000);
-  console.log(`${savedCount}개의 완료된 캔들을 Supabase에 반영했습니다.`);
-  console.log("BTCUSDT 기술지표 계산을 시작합니다.");
-  await analyzeBtcTechnical();
-  console.log("BTCUSDT 시장점수 계산을 시작합니다.");
-  await generateBtcMarketScore();
-  console.log("BTC 관련 뉴스 수집을 시작합니다.");
-  await collectBtcNews();
-  console.log("BTC 뉴스 규칙 기반 분석을 시작합니다.");
-  await analyzePendingBtcNewsByRules(50);
-  console.log("BTC 뉴스 종합점수 계산을 시작합니다.");
-  await generateBtcNewsScore(24);
-  console.log("BTC 뉴스 인텔리전스 V2 계산을 시작합니다.");
-  await enrichLatestBtcNewsScore();
-  console.log("BTC Funding AI 계산을 시작합니다.");
-  await generateBtcFundingSnapshot();
-  console.log("Final Market AI 계산을 시작합니다.");
-  await generateFinalMarketDecision();
-  console.log("다중 전략 Paper Trading 처리를 시작합니다.");
-  await runMultiStrategyPaperWorker();
-  console.log("Final Market Backtest V1 처리를 시작합니다.");
-  await runFinalMarketBacktests();
-  console.log("Performance Engine V1 평가를 시작합니다.");
-  await runPerformanceEngine();
-  console.log("Phase 5-1 전략 성과 분석을 시작합니다.");
-  await runStrategyPerformanceAnalyzer();
-  console.log("Phase 5-2 전략 후보 비교를 시작합니다.");
-  const candidateObservations = await runStrategyCandidateComparison();
-  console.log("Phase 5-3 학습·검증 기간 분리를 시작합니다.");
-  const validation = await runStrategyWalkForwardValidation(
-    candidateObservations,
-  );
-  console.log("Phase 5-4 최적 전략 추천 평가를 시작합니다.");
-  await runStrategyRecommendation(validation);
-  console.log("Phase 5-5 전략 최적화 통합 상태를 점검합니다.");
-  await runOptimizationReadiness();
-  console.log("워커 실행이 완료되었습니다.");
+  const tracker = new WorkerExecutionTracker();
+  const acquired = await tracker.start();
+  if (!acquired) {
+    console.log("이전 워커가 실행 중이므로 이번 실행을 안전하게 건너뜁니다.");
+    return;
+  }
+
+  try {
+    await tracker.stage("candles", "BTCUSDT 1분봉 수집", async () => {
+      const savedCount = await collectBinanceBtcCandles(1000);
+      console.log(`${savedCount}개의 완료된 캔들을 Supabase에 반영했습니다.`);
+    });
+    await tracker.stage("technical", "기술지표 계산", analyzeBtcTechnical);
+    await tracker.stage("market_score", "시장점수 계산", generateBtcMarketScore);
+    await tracker.stage("news_collect", "BTC 뉴스 수집", collectBtcNews);
+    await tracker.stage("news_rules", "뉴스 규칙 분석", () =>
+      analyzePendingBtcNewsByRules(50),
+    );
+    await tracker.stage("news_score", "뉴스 종합점수", () =>
+      generateBtcNewsScore(24),
+    );
+    await tracker.stage("news_v2", "뉴스 인텔리전스 V2", enrichLatestBtcNewsScore);
+    await tracker.stage("funding", "Funding AI", generateBtcFundingSnapshot);
+    await tracker.stage("decision", "Final Market AI", generateFinalMarketDecision);
+    await tracker.stage("paper", "다중 전략 모의매매", runMultiStrategyPaperWorker);
+    await tracker.stage("backtest", "Final Market Backtest", runFinalMarketBacktests);
+    await tracker.stage("performance", "Performance Engine", runPerformanceEngine);
+    await tracker.stage("phase5_1", "전략 성과 분석", runStrategyPerformanceAnalyzer);
+    const candidateObservations = await tracker.stage(
+      "phase5_2",
+      "전략 후보 비교",
+      runStrategyCandidateComparison,
+    );
+    const validation = await tracker.stage(
+      "phase5_3",
+      "학습·검증 기간 분리",
+      () => runStrategyWalkForwardValidation(candidateObservations),
+    );
+    await tracker.stage("phase5_4", "안전 전략 추천", () =>
+      runStrategyRecommendation(validation),
+    );
+    await tracker.stage("phase5_5", "최적화 통합 상태", runOptimizationReadiness);
+    await tracker.finish();
+    console.log("워커 실행이 완료되었습니다.");
+  } catch (error: unknown) {
+    await tracker.finish(error);
+    throw error;
+  }
 }
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

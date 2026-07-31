@@ -1,19 +1,19 @@
 {
   "project": {
     "name": "MarketMind AI",
-    "version": "5.5.0",
-    "phase": "Phase 5 Strategy Optimization Complete",
-    "updatedAt": "2026-07-31T17:40:00+09:00"
+    "version": "6.0.0-ops",
+    "phase": "Phase 6-0 Operations Automation",
+    "updatedAt": "2026-07-31T18:10:00+09:00"
   },
   "summary": {
     "score": 96,
     "health": "healthy",
-    "overallProgress": 96,
+    "overallProgress": 97,
     "buildStatus": "ready"
   },
   "focus": {
-    "title": "Phase 5 Complete · Data Collection",
-    "description": "전략 성과·후보 비교·기간 분리 검증·안전 추천·통합 상태 점검이 완료됐습니다. 현재는 신뢰 가능한 청산 표본을 수집합니다.",
+    "title": "Phase 6-0 Worker Automation",
+    "description": "5분 자동 실행·중복 실행 방지·단계별 이력 기록으로 선물 모의매매 표본을 안정적으로 수집합니다. 실거래 기능은 포함하지 않습니다.",
     "impact": "매우 높음",
     "estimatedTime": "단계별 검증 진행"
   },

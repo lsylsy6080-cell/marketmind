@@ -463,3 +463,33 @@ export type OptimizationStatusData = {
   status: OptimizationStatusRow | null;
   error: string | null;
 };
+
+export type WorkerRun = {
+  id: number;
+  run_id: string;
+  worker_name: string;
+  status: "running" | "completed" | "failed";
+  trigger_source: string;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  error_message: string | null;
+};
+
+export type WorkerStage = {
+  id: number;
+  execution_run_id: number;
+  stage_key: string;
+  stage_label: string;
+  status: "running" | "completed" | "failed";
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  error_message: string | null;
+};
+
+export type WorkerOperationsData = {
+  runs: WorkerRun[];
+  stages: WorkerStage[];
+  error: string | null;
+};
