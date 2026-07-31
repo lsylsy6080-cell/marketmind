@@ -1,19 +1,23 @@
 import { supabase } from "../lib/supabase";
+import {
+  calculateUnrealizedPnl,
+  determineCloseReason,
+  evaluateEntryEligibility,
+  validateStrategyConfig,
+} from "./PaperTradingRules";
+import type {
+  DecisionAction,
+  DecisionDirection,
+  PaperDecision,
+  PaperPosition,
+  PaperStrategyConfig,
+  PositionSide,
+  TradingPermission,
+} from "./PaperTradingRules";
 
 const BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/price";
 const REQUEST_TIMEOUT_MS = 12_000;
 const DECISION_MAX_AGE_MINUTES = 30;
-
-type PositionSide = "long" | "short";
-type CloseReason =
-  | "take_profit"
-  | "stop_loss"
-  | "max_holding"
-  | "opposite_signal";
-
-type DecisionDirection = "bullish" | "neutral" | "bearish";
-type DecisionAction = "strong_buy" | "buy" | "wait" | "reduce" | "sell";
-type TradingPermission = "allowed" | "caution" | "blocked";
 
 interface PaperAccountRow {
   id: number;
@@ -64,6 +68,18 @@ interface RpcResult {
   return_percent?: number;
 }
 
+interface PaperWorkerOptions {
+  logPrefix?: string;
+}
+
+type StrategyAction =
+  | "opened_long"
+  | "opened_short"
+  | "closed"
+  | "held"
+  | "skipped"
+  | "failed";
+
 function toFiniteNumber(value: number | string, label: string): number {
   const parsed = Number(value);
 
@@ -79,14 +95,46 @@ function round(value: number, digits = 8): number {
   return Math.round(value * multiplier) / multiplier;
 }
 
-function elapsedMinutes(timestamp: string): number {
-  const time = new Date(timestamp).getTime();
+function mapConfig(row: StrategyConfigRow): PaperStrategyConfig {
+  const config: PaperStrategyConfig = {
+    symbol: row.symbol.trim().toUpperCase(),
+    longScoreMin: toFiniteNumber(row.long_score_min, "LONG 기준 점수"),
+    shortScoreMax: toFiniteNumber(row.short_score_max, "SHORT 기준 점수"),
+    confidenceMin: toFiniteNumber(row.confidence_min, "최소 신뢰도"),
+    maxHoldingMinutes: toFiniteNumber(
+      row.max_holding_minutes,
+      "최대 보유 시간",
+    ),
+    allowLong: row.allow_long,
+    allowShort: row.allow_short,
+  };
 
-  if (!Number.isFinite(time)) {
-    throw new Error(`시간 값이 올바르지 않습니다: ${timestamp}`);
-  }
+  validateStrategyConfig(config);
+  return config;
+}
 
-  return Math.max(0, (Date.now() - time) / 60_000);
+function mapDecision(row: FinalDecisionRow | null): PaperDecision | null {
+  if (!row) return null;
+
+  return {
+    decidedAt: row.decided_at,
+    finalScore: toFiniteNumber(row.final_score, "최종 점수"),
+    finalConfidence: toFiniteNumber(row.final_confidence, "최종 신뢰도"),
+    direction: row.direction,
+    action: row.action,
+    tradingPermission: row.trading_permission,
+  };
+}
+
+function mapPosition(row: OpenPositionRow): PaperPosition {
+  return {
+    side: row.side,
+    quantity: toFiniteNumber(row.quantity, "포지션 수량"),
+    entryPrice: toFiniteNumber(row.entry_price, "진입 가격"),
+    stopLossPrice: toFiniteNumber(row.stop_loss_price, "손절 가격"),
+    takeProfitPrice: toFiniteNumber(row.take_profit_price, "익절 가격"),
+    openedAt: row.opened_at,
+  };
 }
 
 async function fetchBinancePrice(symbol: string): Promise<number> {
@@ -99,7 +147,7 @@ async function fetchBinancePrice(symbol: string): Promise<number> {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "MarketMind-AI-Paper-Trading/1.0",
+        "User-Agent": "MarketMind-AI-Paper-Trading/2.0",
       },
       signal: controller.signal,
     });
@@ -161,7 +209,9 @@ async function getAccount(accountId: number): Promise<PaperAccountRow> {
   return data as PaperAccountRow;
 }
 
-async function getLatestDecision(symbol: string): Promise<FinalDecisionRow | null> {
+async function getLatestDecision(
+  symbol: string,
+): Promise<FinalDecisionRow | null> {
   const { data, error } = await supabase
     .from("final_market_decisions")
     .select(`
@@ -206,6 +256,7 @@ async function getOpenPosition(
     .eq("account_id", accountId)
     .eq("symbol", symbol)
     .eq("status", "open")
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -215,77 +266,11 @@ async function getOpenPosition(
   return (data as OpenPositionRow | null) ?? null;
 }
 
-function determineCloseReason(
-  position: OpenPositionRow,
-  config: StrategyConfigRow,
-  decision: FinalDecisionRow | null,
-  marketPrice: number,
-): CloseReason | null {
-  const stopLossPrice = toFiniteNumber(position.stop_loss_price, "손절 가격");
-  const takeProfitPrice = toFiniteNumber(position.take_profit_price, "익절 가격");
-
-  if (position.side === "long") {
-    if (marketPrice <= stopLossPrice) return "stop_loss";
-    if (marketPrice >= takeProfitPrice) return "take_profit";
-  } else {
-    if (marketPrice >= stopLossPrice) return "stop_loss";
-    if (marketPrice <= takeProfitPrice) return "take_profit";
-  }
-
-  if (elapsedMinutes(position.opened_at) >= config.max_holding_minutes) {
-    return "max_holding";
-  }
-
-  if (!decision || decision.trading_permission === "blocked") {
-    return null;
-  }
-
-  const score = toFiniteNumber(decision.final_score, "최종 점수");
-  const confidence = toFiniteNumber(decision.final_confidence, "최종 신뢰도");
-  const confidenceMin = toFiniteNumber(config.confidence_min, "최소 신뢰도");
-
-  if (confidence < confidenceMin) {
-    return null;
-  }
-
-  if (
-    position.side === "long" &&
-    decision.direction === "bearish" &&
-    decision.action === "sell" &&
-    score <= toFiniteNumber(config.short_score_max, "SHORT 기준 점수")
-  ) {
-    return "opposite_signal";
-  }
-
-  if (
-    position.side === "short" &&
-    decision.direction === "bullish" &&
-    (decision.action === "strong_buy" || decision.action === "buy") &&
-    score >= toFiniteNumber(config.long_score_min, "LONG 기준 점수")
-  ) {
-    return "opposite_signal";
-  }
-
-  return null;
-}
-
-function calculateUnrealizedPnl(
-  position: OpenPositionRow,
-  marketPrice: number,
-): number {
-  const entryPrice = toFiniteNumber(position.entry_price, "진입 가격");
-  const quantity = toFiniteNumber(position.quantity, "포지션 수량");
-
-  return position.side === "long"
-    ? (marketPrice - entryPrice) * quantity
-    : (entryPrice - marketPrice) * quantity;
-}
-
 async function insertStrategyRun(params: {
   accountId: number;
   symbol: string;
   decisionId: number | null;
-  actionTaken: "opened_long" | "opened_short" | "closed" | "held" | "skipped" | "failed";
+  actionTaken: StrategyAction;
   reason: string;
   marketPrice: number | null;
 }): Promise<void> {
@@ -294,7 +279,7 @@ async function insertStrategyRun(params: {
     symbol: params.symbol,
     decision_id: params.decisionId,
     action_taken: params.actionTaken,
-    reason: params.reason,
+    reason: params.reason.slice(0, 1000),
     market_price: params.marketPrice,
   });
 
@@ -314,10 +299,9 @@ async function insertEquitySnapshot(params: {
   let reservedNotional = 0;
 
   if (params.position) {
-    unrealizedPnl = calculateUnrealizedPnl(params.position, params.marketPrice);
-    reservedNotional =
-      toFiniteNumber(params.position.entry_price, "진입 가격") *
-      toFiniteNumber(params.position.quantity, "수량");
+    const position = mapPosition(params.position);
+    unrealizedPnl = calculateUnrealizedPnl(position, params.marketPrice);
+    reservedNotional = position.entryPrice * position.quantity;
   }
 
   const { error } = await supabase.from("paper_equity_snapshots").insert({
@@ -335,112 +319,144 @@ async function insertEquitySnapshot(params: {
   }
 }
 
-async function processConfig(config: StrategyConfigRow): Promise<void> {
-  const [marketPrice, latestDecision, openPosition] = await Promise.all([
-    fetchBinancePrice(config.symbol),
-    getLatestDecision(config.symbol),
-    getOpenPosition(config.account_id, config.symbol),
-  ]);
+async function processOpenPosition(params: {
+  row: StrategyConfigRow;
+  config: PaperStrategyConfig;
+  decisionRow: FinalDecisionRow | null;
+  positionRow: OpenPositionRow;
+  marketPrice: number;
+}): Promise<void> {
+  const decision = mapDecision(params.decisionRow);
+  const closeReason = determineCloseReason(
+    mapPosition(params.positionRow),
+    params.config,
+    decision,
+    params.marketPrice,
+    DECISION_MAX_AGE_MINUTES,
+  );
 
-  const decisionId = latestDecision?.id ?? null;
+  if (!closeReason) {
+    await insertStrategyRun({
+      accountId: params.row.account_id,
+      symbol: params.config.symbol,
+      decisionId: params.decisionRow?.id ?? null,
+      actionTaken: "held",
+      reason: "익절·손절·최대 보유·유효한 반대 신호 조건이 없어 포지션을 유지했습니다.",
+      marketPrice: params.marketPrice,
+    });
+    return;
+  }
+
+  const { data, error } = await supabase.rpc("paper_close_position_v1", {
+    p_position_id: params.positionRow.id,
+    p_market_price: params.marketPrice,
+    p_close_reason: closeReason,
+  });
+
+  if (error) {
+    throw new Error(`포지션 청산 실패: ${error.message}`);
+  }
+
+  const result = (data ?? {}) as RpcResult;
+  const closed = result.status === "closed";
+  const netPnl = Number(result.net_pnl ?? 0);
+
+  await insertStrategyRun({
+    accountId: params.row.account_id,
+    symbol: params.config.symbol,
+    decisionId: params.decisionRow?.id ?? null,
+    actionTaken: closed ? "closed" : "skipped",
+    reason: closed
+      ? `${closeReason} 조건으로 포지션을 청산했습니다. 순손익 ${round(Number.isFinite(netPnl) ? netPnl : 0, 4)} USDT`
+      : result.reason ?? "청산이 건너뛰어졌습니다.",
+    marketPrice: params.marketPrice,
+  });
+}
+
+async function processNewEntry(params: {
+  row: StrategyConfigRow;
+  config: PaperStrategyConfig;
+  decisionRow: FinalDecisionRow | null;
+  marketPrice: number;
+}): Promise<void> {
+  const eligibility = evaluateEntryEligibility(
+    params.config,
+    mapDecision(params.decisionRow),
+    DECISION_MAX_AGE_MINUTES,
+  );
+
+  if (!eligibility.allowed || !params.decisionRow) {
+    await insertStrategyRun({
+      accountId: params.row.account_id,
+      symbol: params.config.symbol,
+      decisionId: params.decisionRow?.id ?? null,
+      actionTaken: "skipped",
+      reason: eligibility.reason,
+      marketPrice: params.marketPrice,
+    });
+    return;
+  }
+
+  const { data, error } = await supabase.rpc("paper_open_position_v1", {
+    p_account_id: params.row.account_id,
+    p_config_id: params.row.id,
+    p_decision_id: params.decisionRow.id,
+    p_market_price: params.marketPrice,
+  });
+
+  if (error) {
+    throw new Error(`포지션 진입 실패: ${error.message}`);
+  }
+
+  const result = (data ?? {}) as RpcResult;
+  const opened = result.status === "opened";
+  const side = result.side;
+
+  await insertStrategyRun({
+    accountId: params.row.account_id,
+    symbol: params.config.symbol,
+    decisionId: params.decisionRow.id,
+    actionTaken:
+      opened && side === "long"
+        ? "opened_long"
+        : opened && side === "short"
+          ? "opened_short"
+          : "skipped",
+    reason: opened
+      ? `${side === "long" ? "LONG" : "SHORT"} 모의 포지션을 열었습니다.`
+      : result.reason ?? "진입이 건너뛰어졌습니다.",
+    marketPrice: params.marketPrice,
+  });
+}
+
+async function processConfig(
+  row: StrategyConfigRow,
+  marketPrice: number,
+  decisionRow: FinalDecisionRow | null,
+): Promise<void> {
+  const config = mapConfig(row);
+  const openPosition = await getOpenPosition(row.account_id, config.symbol);
 
   if (openPosition) {
-    const closeReason = determineCloseReason(
-      openPosition,
+    await processOpenPosition({
+      row,
       config,
-      latestDecision,
-      marketPrice,
-    );
-
-    if (closeReason) {
-      const { data, error } = await supabase.rpc("paper_close_position_v1", {
-        p_position_id: openPosition.id,
-        p_market_price: marketPrice,
-        p_close_reason: closeReason,
-      });
-
-      if (error) {
-        throw new Error(`포지션 청산 실패: ${error.message}`);
-      }
-
-      const result = (data ?? {}) as RpcResult;
-      const reason =
-        result.status === "closed"
-          ? `${closeReason} 조건으로 포지션을 청산했습니다. 순손익 ${round(Number(result.net_pnl ?? 0), 4)} USDT`
-          : result.reason ?? "청산이 건너뛰어졌습니다.";
-
-      await insertStrategyRun({
-        accountId: config.account_id,
-        symbol: config.symbol,
-        decisionId,
-        actionTaken: result.status === "closed" ? "closed" : "skipped",
-        reason,
-        marketPrice,
-      });
-    } else {
-      await insertStrategyRun({
-        accountId: config.account_id,
-        symbol: config.symbol,
-        decisionId,
-        actionTaken: "held",
-        reason: "익절·손절·최대 보유·반대 신호 조건이 없어 포지션을 유지했습니다.",
-        marketPrice,
-      });
-    }
-  } else if (!latestDecision) {
-    await insertStrategyRun({
-      accountId: config.account_id,
-      symbol: config.symbol,
-      decisionId: null,
-      actionTaken: "skipped",
-      reason: "Final Market AI 판단 데이터가 없습니다.",
-      marketPrice,
-    });
-  } else if (elapsedMinutes(latestDecision.decided_at) > DECISION_MAX_AGE_MINUTES) {
-    await insertStrategyRun({
-      accountId: config.account_id,
-      symbol: config.symbol,
-      decisionId,
-      actionTaken: "skipped",
-      reason: `최신 판단이 ${DECISION_MAX_AGE_MINUTES}분보다 오래되어 진입하지 않았습니다.`,
+      decisionRow,
+      positionRow: openPosition,
       marketPrice,
     });
   } else {
-    const { data, error } = await supabase.rpc("paper_open_position_v1", {
-      p_account_id: config.account_id,
-      p_config_id: config.id,
-      p_decision_id: latestDecision.id,
-      p_market_price: marketPrice,
-    });
-
-    if (error) {
-      throw new Error(`포지션 진입 실패: ${error.message}`);
-    }
-
-    const result = (data ?? {}) as RpcResult;
-    const opened = result.status === "opened";
-    const side = result.side;
-
-    await insertStrategyRun({
-      accountId: config.account_id,
-      symbol: config.symbol,
-      decisionId,
-      actionTaken:
-        opened && side === "long"
-          ? "opened_long"
-          : opened && side === "short"
-            ? "opened_short"
-            : "skipped",
-      reason: opened
-        ? `${side === "long" ? "LONG" : "SHORT"} 모의 포지션을 열었습니다.`
-        : result.reason ?? "진입이 건너뛰어졌습니다.",
+    await processNewEntry({
+      row,
+      config,
+      decisionRow,
       marketPrice,
     });
   }
 
   const [accountAfter, positionAfter] = await Promise.all([
-    getAccount(config.account_id),
-    getOpenPosition(config.account_id, config.symbol),
+    getAccount(row.account_id),
+    getOpenPosition(row.account_id, config.symbol),
   ]);
 
   await insertEquitySnapshot({
@@ -451,7 +467,10 @@ async function processConfig(config: StrategyConfigRow): Promise<void> {
   });
 }
 
-export async function runPaperTradingWorker(): Promise<void> {
+export async function runPaperTradingWorker(
+  options: PaperWorkerOptions = {},
+): Promise<void> {
+  const logPrefix = options.logPrefix ?? "Paper Trading";
   const configs = await getActiveConfigs();
 
   if (configs.length === 0) {
@@ -459,23 +478,41 @@ export async function runPaperTradingWorker(): Promise<void> {
     return;
   }
 
-  for (const config of configs) {
+  const marketPriceCache = new Map<string, Promise<number>>();
+  const decisionCache = new Map<string, Promise<FinalDecisionRow | null>>();
+
+  for (const row of configs) {
+    const symbol = row.symbol.trim().toUpperCase();
+
     try {
-      console.log(`[Paper Trading] ${config.symbol} 전략 실행을 시작합니다.`);
-      await processConfig(config);
-      console.log(`[Paper Trading] ${config.symbol} 전략 실행이 완료되었습니다.`);
+      if (!marketPriceCache.has(symbol)) {
+        marketPriceCache.set(symbol, fetchBinancePrice(symbol));
+      }
+
+      if (!decisionCache.has(symbol)) {
+        decisionCache.set(symbol, getLatestDecision(symbol));
+      }
+
+      const [marketPrice, latestDecision] = await Promise.all([
+        marketPriceCache.get(symbol) as Promise<number>,
+        decisionCache.get(symbol) as Promise<FinalDecisionRow | null>,
+      ]);
+
+      console.log(`[${logPrefix}] config=${row.id} ${symbol} 전략 실행 시작`);
+      await processConfig(row, marketPrice, latestDecision);
+      console.log(`[${logPrefix}] config=${row.id} ${symbol} 전략 실행 완료`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
 
-      console.error(`[Paper Trading] ${config.symbol} 실행 실패:`, message);
+      console.error(`[${logPrefix}] config=${row.id} ${symbol} 실행 실패:`, message);
 
       try {
         await insertStrategyRun({
-          accountId: config.account_id,
-          symbol: config.symbol,
+          accountId: row.account_id,
+          symbol,
           decisionId: null,
           actionTaken: "failed",
-          reason: message.slice(0, 1000),
+          reason: message,
           marketPrice: null,
         });
       } catch (loggingError) {

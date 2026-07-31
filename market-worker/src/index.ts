@@ -9,8 +9,8 @@ import { analyzePendingBtcNewsByRules } from "./news/analyze-news-rules";
 import { collectBtcNews } from "./news/collect-news";
 import { enrichLatestBtcNewsScore } from "./news/btc-news-intelligence-v2";
 import { generateBtcNewsScore } from "./news/btc-news-score";
-import { runPaperTradingWorker } from "./paper/run-paper-trading-worker";
 import { runMultiStrategyPaperWorker } from "./paper/run-multi-strategy-paper-worker";
+import { runStrategyPerformanceAnalyzer } from "./optimization/run-strategy-performance-analyzer";
 
 async function main(): Promise<void> {
   console.log("BTCUSDT 1분봉 수집을 시작합니다.");
@@ -34,13 +34,12 @@ async function main(): Promise<void> {
   await generateFinalMarketDecision();
   console.log("다중 전략 Paper Trading 처리를 시작합니다.");
   await runMultiStrategyPaperWorker();
-  console.log("Paper Trading Worker V1 처리를 시작합니다.");
-  const paperTradingResult = await runPaperTradingWorker();
-  console.log("Paper Trading Worker V1 결과:", paperTradingResult);
   console.log("Final Market Backtest V1 처리를 시작합니다.");
   await runFinalMarketBacktests();
   console.log("Performance Engine V1 평가를 시작합니다.");
   await runPerformanceEngine();
+  console.log("Phase 5-1 전략 성과 분석을 시작합니다.");
+  await runStrategyPerformanceAnalyzer();
   console.log("워커 실행이 완료되었습니다.");
 }
 main().catch((error: unknown) => {

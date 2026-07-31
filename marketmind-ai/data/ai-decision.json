@@ -1,0 +1,96 @@
+{
+  "current": {
+    "id": "btc-1h-2026-07-31-1700",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "signal": "WAIT",
+    "confidence": 68,
+    "marketScore": 61,
+    "trend": "NEUTRAL",
+    "risk": "MEDIUM",
+    "summary": "가격 추세는 회복 중이지만 펀딩비와 뉴스 흐름의 확증이 부족해 신규 진입보다 관망이 유리합니다.",
+    "factors": [
+      {
+        "key": "funding",
+        "label": "Funding",
+        "score": -8,
+        "state": "negative",
+        "summary": "롱 포지션 쏠림이 일부 관찰되어 추격 진입 리스크가 있습니다."
+      },
+      {
+        "key": "etf",
+        "label": "ETF Flow",
+        "score": 14,
+        "state": "positive",
+        "summary": "현물 ETF 흐름은 완만한 매수 우위를 유지하고 있습니다."
+      },
+      {
+        "key": "news",
+        "label": "News",
+        "score": 3,
+        "state": "neutral",
+        "summary": "시장 방향을 강하게 바꿀 만한 뉴스 촉매는 제한적입니다."
+      },
+      {
+        "key": "technical",
+        "label": "Technical",
+        "score": 11,
+        "state": "positive",
+        "summary": "단기 구조는 개선됐지만 주요 저항 돌파 확인이 필요합니다."
+      },
+      {
+        "key": "structure",
+        "label": "Market Structure",
+        "score": 5,
+        "state": "neutral",
+        "summary": "고점과 저점 구조가 아직 뚜렷한 추세 전환을 확정하지 못했습니다."
+      }
+    ],
+    "generatedAt": "2026-07-31T08:00:00.000Z",
+    "modelVersion": "decision-engine-preview-0.1"
+  },
+  "history": [
+    {
+      "id": "btc-1h-2026-07-31-1600",
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "signal": "LONG",
+      "confidence": 74,
+      "marketScore": 69,
+      "trend": "BULLISH",
+      "risk": "MEDIUM",
+      "summary": "기술적 반등과 ETF 흐름이 동시에 개선되어 제한적 상승 우위를 판단했습니다.",
+      "factors": [],
+      "generatedAt": "2026-07-31T07:00:00.000Z",
+      "modelVersion": "decision-engine-preview-0.1"
+    },
+    {
+      "id": "btc-1h-2026-07-31-1500",
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "signal": "WAIT",
+      "confidence": 59,
+      "marketScore": 55,
+      "trend": "NEUTRAL",
+      "risk": "HIGH",
+      "summary": "변동성이 확대되는 구간으로 방향성 확정 전까지 관망이 적절했습니다.",
+      "factors": [],
+      "generatedAt": "2026-07-31T06:00:00.000Z",
+      "modelVersion": "decision-engine-preview-0.1"
+    },
+    {
+      "id": "btc-1h-2026-07-31-1400",
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "signal": "SHORT",
+      "confidence": 71,
+      "marketScore": 38,
+      "trend": "BEARISH",
+      "risk": "MEDIUM",
+      "summary": "단기 지지 이탈과 파생시장 약세 신호가 겹쳐 하락 우위를 판단했습니다.",
+      "factors": [],
+      "generatedAt": "2026-07-31T05:00:00.000Z",
+      "modelVersion": "decision-engine-preview-0.1"
+    }
+  ]
+}
