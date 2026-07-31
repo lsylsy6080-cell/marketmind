@@ -11,6 +11,10 @@ import { enrichLatestBtcNewsScore } from "./news/btc-news-intelligence-v2";
 import { generateBtcNewsScore } from "./news/btc-news-score";
 import { runMultiStrategyPaperWorker } from "./paper/run-multi-strategy-paper-worker";
 import { runStrategyPerformanceAnalyzer } from "./optimization/run-strategy-performance-analyzer";
+import { runStrategyCandidateComparison } from "./optimization/run-strategy-candidate-comparison";
+import { runStrategyWalkForwardValidation } from "./optimization/run-strategy-walk-forward-validation";
+import { runStrategyRecommendation } from "./optimization/run-strategy-recommendation";
+import { runOptimizationReadiness } from "./optimization/run-optimization-readiness";
 
 async function main(): Promise<void> {
   console.log("BTCUSDT 1분봉 수집을 시작합니다.");
@@ -40,6 +44,16 @@ async function main(): Promise<void> {
   await runPerformanceEngine();
   console.log("Phase 5-1 전략 성과 분석을 시작합니다.");
   await runStrategyPerformanceAnalyzer();
+  console.log("Phase 5-2 전략 후보 비교를 시작합니다.");
+  const candidateObservations = await runStrategyCandidateComparison();
+  console.log("Phase 5-3 학습·검증 기간 분리를 시작합니다.");
+  const validation = await runStrategyWalkForwardValidation(
+    candidateObservations,
+  );
+  console.log("Phase 5-4 최적 전략 추천 평가를 시작합니다.");
+  await runStrategyRecommendation(validation);
+  console.log("Phase 5-5 전략 최적화 통합 상태를 점검합니다.");
+  await runOptimizationReadiness();
   console.log("워커 실행이 완료되었습니다.");
 }
 main().catch((error: unknown) => {

@@ -21,6 +21,8 @@ import { StrategyValidationPanel } from "@/dashboard/components/StrategyValidati
 import { getStrategyValidationData } from "@/dashboard/validation-data";
 import { StrategyRecommendationPanel } from "@/dashboard/components/StrategyRecommendationPanel";
 import { getStrategyRecommendationData } from "@/dashboard/recommendation-data";
+import { OptimizationStatusPanel } from "@/dashboard/components/OptimizationStatusPanel";
+import { getOptimizationStatusData } from "@/dashboard/optimization-status-data";
 import { getMarketIntelligenceDashboardData } from "@/dashboard/data";
 import { getPaperTradingData } from "@/dashboard/paper-data";
 import { getStrategyComparisonData } from "@/dashboard/strategy-compare-data";
@@ -35,6 +37,7 @@ export default async function HomePage() {
     candidateComparison,
     strategyValidation,
     strategyRecommendation,
+    optimizationStatus,
   ] = await Promise.all([
     getMarketIntelligenceDashboardData(),
     getPaperTradingData(),
@@ -42,6 +45,7 @@ export default async function HomePage() {
     getCandidateComparisonData(),
     getStrategyValidationData(),
     getStrategyRecommendationData(),
+    getOptimizationStatusData(),
   ]);
   const latestDecision = dashboardData.decisions[0] ?? null;
   const chronologicalDecisions = [...dashboardData.decisions].reverse();
@@ -133,14 +137,15 @@ export default async function HomePage() {
         <CandidateComparisonPanel data={candidateComparison} />
         <StrategyValidationPanel data={strategyValidation} />
         <StrategyRecommendationPanel data={strategyRecommendation} />
+        <OptimizationStatusPanel data={optimizationStatus} />
 
         {dashboardData.decisions.length > 0 ? (
           <RecentDecisions decisions={dashboardData.decisions.slice(0, 10)} />
         ) : null}
 
         <footer className="terminal-footer">
-          <span>MarketMind AI · Dashboard Phase 5-4</span>
-          <span>Walk-Forward Validation · Safe Recommendation</span>
+          <span>MarketMind AI · Dashboard Phase 5 Complete</span>
+          <span>Optimization · Validation · Manual Approval Lock</span>
         </footer>
       </div>
     </main>

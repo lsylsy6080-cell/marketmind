@@ -1,19 +1,19 @@
 {
   "project": {
     "name": "MarketMind AI",
-    "version": "5.4.0",
-    "phase": "Phase 5-4 Strategy Recommendation",
-    "updatedAt": "2026-07-31T17:10:00+09:00"
+    "version": "5.5.0",
+    "phase": "Phase 5 Strategy Optimization Complete",
+    "updatedAt": "2026-07-31T17:40:00+09:00"
   },
   "summary": {
-    "score": 95,
+    "score": 96,
     "health": "healthy",
-    "overallProgress": 94,
+    "overallProgress": 96,
     "buildStatus": "ready"
   },
   "focus": {
-    "title": "Phase 5-4 Safe Recommendation",
-    "description": "검증 통과 후보만 종합 평가하고 표본 부족·과최적화 시 추천을 보류합니다. 실제 설정은 수동 승인만 허용합니다.",
+    "title": "Phase 5 Complete · Data Collection",
+    "description": "전략 성과·후보 비교·기간 분리 검증·안전 추천·통합 상태 점검이 완료됐습니다. 현재는 신뢰 가능한 청산 표본을 수집합니다.",
     "impact": "매우 높음",
     "estimatedTime": "단계별 검증 진행"
   },

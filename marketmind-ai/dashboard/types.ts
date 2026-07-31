@@ -436,3 +436,30 @@ export type StrategyRecommendationData = {
   recommendation: StrategyRecommendationRow | null;
   error: string | null;
 };
+
+export type OptimizationReadinessCheck = {
+  key: "performance" | "candidates" | "validation" | "recommendation" | "manual_lock";
+  label: string;
+  status: "complete" | "collecting" | "attention" | "locked";
+  detail: string;
+};
+
+export type OptimizationStatusRow = {
+  id: number;
+  overall_status: "collecting" | "ready_for_review" | "attention";
+  progress_percent: number;
+  safe_for_automatic_application: false;
+  summary: string;
+  checks: OptimizationReadinessCheck[];
+  strategy_count: number;
+  max_trade_count: number;
+  eligible_candidate_count: number;
+  validated_candidate_count: number;
+  recommendation_id: number | null;
+  checked_at: string;
+};
+
+export type OptimizationStatusData = {
+  status: OptimizationStatusRow | null;
+  error: string | null;
+};
