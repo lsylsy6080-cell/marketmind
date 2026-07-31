@@ -394,3 +394,45 @@ export type StrategyValidationData = {
   rows: StrategyValidationRow[];
   error: string | null;
 };
+
+export type StrategyRecommendationRanking = {
+  candidateKey: string;
+  candidateName: string;
+  candidateKind: string;
+  rank: number | null;
+  score: number;
+  eligible: boolean;
+  robustnessStatus: "insufficient" | "robust" | "watch" | "overfit";
+  validationTrades: number;
+  validationExpectedReturn: number | null;
+  validationProfitFactor: number | null;
+  validationMaxDrawdown: number;
+  returnRetentionRatio: number | null;
+  reason: string;
+};
+
+export type StrategyRecommendationRow = {
+  id: number;
+  source_validation_run_id: string;
+  recommendation_status: "recommended" | "hold";
+  selected_candidate_key: string | null;
+  selected_candidate_name: string | null;
+  selected_candidate_kind: string | null;
+  recommendation_score: number | null;
+  recommendation_confidence: number;
+  recommendation_reason: string;
+  eligible_candidate_count: number;
+  selected_long_score_min: number | null;
+  selected_short_score_max: number | null;
+  selected_confidence_min: number | null;
+  selected_position_size_percent: number | null;
+  candidate_rankings: StrategyRecommendationRanking[];
+  requires_manual_approval: boolean;
+  applied_at: string | null;
+  recommended_at: string;
+};
+
+export type StrategyRecommendationData = {
+  recommendation: StrategyRecommendationRow | null;
+  error: string | null;
+};

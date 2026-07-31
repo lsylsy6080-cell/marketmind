@@ -19,6 +19,8 @@ import { CandidateComparisonPanel } from "@/dashboard/components/CandidateCompar
 import { getCandidateComparisonData } from "@/dashboard/candidate-comparison-data";
 import { StrategyValidationPanel } from "@/dashboard/components/StrategyValidationPanel";
 import { getStrategyValidationData } from "@/dashboard/validation-data";
+import { StrategyRecommendationPanel } from "@/dashboard/components/StrategyRecommendationPanel";
+import { getStrategyRecommendationData } from "@/dashboard/recommendation-data";
 import { getMarketIntelligenceDashboardData } from "@/dashboard/data";
 import { getPaperTradingData } from "@/dashboard/paper-data";
 import { getStrategyComparisonData } from "@/dashboard/strategy-compare-data";
@@ -32,12 +34,14 @@ export default async function HomePage() {
     strategyComparison,
     candidateComparison,
     strategyValidation,
+    strategyRecommendation,
   ] = await Promise.all([
     getMarketIntelligenceDashboardData(),
     getPaperTradingData(),
     getStrategyComparisonData(),
     getCandidateComparisonData(),
     getStrategyValidationData(),
+    getStrategyRecommendationData(),
   ]);
   const latestDecision = dashboardData.decisions[0] ?? null;
   const chronologicalDecisions = [...dashboardData.decisions].reverse();
@@ -128,14 +132,15 @@ export default async function HomePage() {
         <StrategyComparePanel data={strategyComparison} />
         <CandidateComparisonPanel data={candidateComparison} />
         <StrategyValidationPanel data={strategyValidation} />
+        <StrategyRecommendationPanel data={strategyRecommendation} />
 
         {dashboardData.decisions.length > 0 ? (
           <RecentDecisions decisions={dashboardData.decisions.slice(0, 10)} />
         ) : null}
 
         <footer className="terminal-footer">
-          <span>MarketMind AI · Dashboard Phase 5-3</span>
-          <span>Strategy Candidates · Walk-Forward Validation</span>
+          <span>MarketMind AI · Dashboard Phase 5-4</span>
+          <span>Walk-Forward Validation · Safe Recommendation</span>
         </footer>
       </div>
     </main>

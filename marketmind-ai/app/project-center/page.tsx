@@ -43,8 +43,8 @@ export default async function ProjectCenterPage() {
         />
 
         <footer className="terminal-footer">
-          <span>MarketMind AI · Project Center v5.3</span>
-          <span>Phase 5-2 Candidates · Phase 5-3 Walk-Forward Validation</span>
+          <span>MarketMind AI · Project Center v5.4</span>
+          <span>Phase 5-3 Validation · Phase 5-4 Safe Recommendation</span>
         </footer>
       </div>
     </main>
