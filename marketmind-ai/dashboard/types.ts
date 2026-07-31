@@ -361,3 +361,36 @@ export type CandidateComparisonData = {
   rows: CandidateComparisonRow[];
   error: string | null;
 };
+
+export type StrategyValidationRow = {
+  id: number;
+  validation_run_id: string;
+  candidate_key: string;
+  candidate_name: string;
+  candidate_kind: "conservative" | "balanced" | "aggressive";
+  symbol: string;
+  training_ratio: number;
+  source_observation_count: number;
+  split_at: string | null;
+  training_observations: number;
+  validation_observations: number;
+  training_trades: number;
+  validation_trades: number;
+  training_expected_return: number | null;
+  validation_expected_return: number | null;
+  training_profit_factor: number | null;
+  validation_profit_factor: number | null;
+  training_max_drawdown: number;
+  validation_max_drawdown: number;
+  return_retention_ratio: number | null;
+  profit_factor_retention_ratio: number | null;
+  robustness_status: "insufficient" | "robust" | "watch" | "overfit";
+  validation_eligible: boolean;
+  validation_reason: string;
+  analyzed_at: string;
+};
+
+export type StrategyValidationData = {
+  rows: StrategyValidationRow[];
+  error: string | null;
+};

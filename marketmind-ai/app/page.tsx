@@ -17,6 +17,8 @@ import { SignalComposition } from "@/dashboard/components/SignalComposition";
 import { StrategyComparePanel } from "@/dashboard/components/StrategyComparePanel";
 import { CandidateComparisonPanel } from "@/dashboard/components/CandidateComparisonPanel";
 import { getCandidateComparisonData } from "@/dashboard/candidate-comparison-data";
+import { StrategyValidationPanel } from "@/dashboard/components/StrategyValidationPanel";
+import { getStrategyValidationData } from "@/dashboard/validation-data";
 import { getMarketIntelligenceDashboardData } from "@/dashboard/data";
 import { getPaperTradingData } from "@/dashboard/paper-data";
 import { getStrategyComparisonData } from "@/dashboard/strategy-compare-data";
@@ -29,11 +31,13 @@ export default async function HomePage() {
     dashboardData,
     strategyComparison,
     candidateComparison,
+    strategyValidation,
   ] = await Promise.all([
     getMarketIntelligenceDashboardData(),
     getPaperTradingData(),
     getStrategyComparisonData(),
     getCandidateComparisonData(),
+    getStrategyValidationData(),
   ]);
   const latestDecision = dashboardData.decisions[0] ?? null;
   const chronologicalDecisions = [...dashboardData.decisions].reverse();
@@ -123,14 +127,15 @@ export default async function HomePage() {
         <PaperTradingSummary data={dashboardData} />
         <StrategyComparePanel data={strategyComparison} />
         <CandidateComparisonPanel data={candidateComparison} />
+        <StrategyValidationPanel data={strategyValidation} />
 
         {dashboardData.decisions.length > 0 ? (
           <RecentDecisions decisions={dashboardData.decisions.slice(0, 10)} />
         ) : null}
 
         <footer className="terminal-footer">
-          <span>MarketMind AI · Dashboard Phase 5-2</span>
-          <span>Decision · Paper Trading · Backtest · Strategy Candidates</span>
+          <span>MarketMind AI · Dashboard Phase 5-3</span>
+          <span>Strategy Candidates · Walk-Forward Validation</span>
         </footer>
       </div>
     </main>
