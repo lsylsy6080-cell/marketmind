@@ -14,6 +14,10 @@ import type {
   PaperTradingAccount,
   PaperTradingData,
   PerformanceSummary,
+  StrategyPerformanceSnapshot,
+  StrategyExcursionMetrics,
+  ExcursionDistributionBucket,
+  StrategyPerformanceSlice,
 } from "./types";
 
 function numberValue(value: unknown): number {
@@ -78,6 +82,7 @@ export const emptyPaperTradingData: PaperTradingData = {
   funding: null,
   backtestSummary: emptyBacktestSummary,
   performanceSummary: emptyPerformanceSummary,
+  strategyPerformance: null,
   openPositions: [],
   orders: [],
   trades: [],
@@ -154,6 +159,105 @@ function summarizePerformance(
         : null,
     bestDirectionalReturn: returns.length > 0 ? Math.max(...returns) : null,
     worstDirectionalReturn: returns.length > 0 ? Math.min(...returns) : null,
+  };
+}
+
+function performanceSlice(value: unknown): StrategyPerformanceSlice[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+    .map((row) => ({
+      ...(typeof row.side === "string" ? { side: row.side as "long" | "short" } : {}),
+      ...(typeof row.bucket === "string" ? { bucket: row.bucket } : {}),
+      ...(typeof row.reason === "string" ? { reason: row.reason } : {}),
+      ...(nullableNumber(row.minConfidence) !== null ? { minConfidence: nullableNumber(row.minConfidence) ?? undefined } : {}),
+      ...(nullableNumber(row.maxConfidence) !== null ? { maxConfidence: nullableNumber(row.maxConfidence) ?? undefined } : {}),
+      totalTrades: numberValue(row.totalTrades),
+      winningTrades: numberValue(row.winningTrades),
+      losingTrades: numberValue(row.losingTrades),
+      breakevenTrades: numberValue(row.breakevenTrades),
+      winRate: nullableNumber(row.winRate),
+      netPnl: numberValue(row.netPnl),
+      averagePnl: nullableNumber(row.averagePnl),
+      averageReturnPercent: nullableNumber(row.averageReturnPercent),
+      profitFactor: nullableNumber(row.profitFactor),
+    }));
+}
+
+function excursionDistribution(value: unknown): ExcursionDistributionBucket[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      bucket: typeof item.bucket === "string" ? item.bucket : "—",
+      trades: numberValue(item.trades),
+      rate: nullableNumber(item.rate),
+      minPercent: numberValue(item.minPercent),
+      maxPercent: nullableNumber(item.maxPercent),
+    }));
+}
+
+function excursionMetrics(value: unknown): StrategyExcursionMetrics | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  return {
+    samples: numberValue(row.samples),
+    averageMfePercent: nullableNumber(row.averageMfePercent),
+    medianMfePercent: nullableNumber(row.medianMfePercent),
+    p25MfePercent: nullableNumber(row.p25MfePercent),
+    p75MfePercent: nullableNumber(row.p75MfePercent),
+    maxMfePercent: nullableNumber(row.maxMfePercent),
+    averageMaePercent: nullableNumber(row.averageMaePercent),
+    medianMaePercent: nullableNumber(row.medianMaePercent),
+    p25MaePercent: nullableNumber(row.p25MaePercent),
+    p75MaePercent: nullableNumber(row.p75MaePercent),
+    minMaePercent: nullableNumber(row.minMaePercent),
+    tpTargetPercent: nullableNumber(row.tpTargetPercent),
+    slTargetPercent: nullableNumber(row.slTargetPercent),
+    tpReachTrades: numberValue(row.tpReachTrades),
+    slReachTrades: numberValue(row.slReachTrades),
+    tpReachRate: nullableNumber(row.tpReachRate),
+    slReachRate: nullableNumber(row.slReachRate),
+    breakEvenActivationPercent: nullableNumber(row.breakEvenActivationPercent),
+    trailingActivationPercent: nullableNumber(row.trailingActivationPercent),
+    breakEvenOpportunityTrades: numberValue(row.breakEvenOpportunityTrades),
+    trailingOpportunityTrades: numberValue(row.trailingOpportunityTrades),
+    breakEvenOpportunityRate: nullableNumber(row.breakEvenOpportunityRate),
+    trailingOpportunityRate: nullableNumber(row.trailingOpportunityRate),
+    mfeDistribution: excursionDistribution(row.mfeDistribution),
+    maeDistribution: excursionDistribution(row.maeDistribution),
+  };
+}
+
+function mapStrategyPerformance(row: Record<string, unknown>): StrategyPerformanceSnapshot {
+  return {
+    ...nullableNumericRow<StrategyPerformanceSnapshot>(row, [
+      "win_rate",
+      "average_return_percent",
+      "average_win",
+      "average_loss",
+      "profit_factor",
+      "max_drawdown",
+      "max_drawdown_percent",
+      "average_holding_seconds",
+      "min_holding_seconds",
+      "max_holding_seconds",
+    ]),
+    id: numberValue(row.id),
+    strategy_config_id: numberValue(row.strategy_config_id),
+    account_id: numberValue(row.account_id),
+    total_trades: numberValue(row.total_trades),
+    winning_trades: numberValue(row.winning_trades),
+    losing_trades: numberValue(row.losing_trades),
+    breakeven_trades: numberValue(row.breakeven_trades),
+    net_pnl: numberValue(row.net_pnl),
+    trades_until_provisional: numberValue(row.trades_until_provisional),
+    trades_until_ready: numberValue(row.trades_until_ready),
+    side_performance: performanceSlice(row.side_performance),
+    confidence_performance: performanceSlice(row.confidence_performance),
+    exit_reason_performance: performanceSlice(row.exit_reason_performance),
+    excursion_metrics: excursionMetrics(row.excursion_metrics),
+    optimization_eligible: Boolean(row.optimization_eligible),
   };
 }
 
@@ -317,6 +421,52 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
     ].find(Boolean);
     if (firstError) throw firstError;
 
+    let strategyPerformance: StrategyPerformanceSnapshot | null = null;
+    const activeConfigId = configResult.data?.id ? Number(configResult.data.id) : null;
+
+    if (activeConfigId !== null) {
+      const activePerformanceResult = await supabase
+        .from("strategy_performance_snapshots")
+        .select("*")
+        .eq("strategy_config_id", activeConfigId)
+        .order("analyzed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (activePerformanceResult.error) throw activePerformanceResult.error;
+      if (activePerformanceResult.data) {
+        const mapped = mapStrategyPerformance(activePerformanceResult.data);
+        const hasV2Data =
+          mapped.average_holding_seconds !== null ||
+          mapped.side_performance.length > 0 ||
+          mapped.confidence_performance.length > 0 ||
+          mapped.exit_reason_performance.length > 0;
+        if (hasV2Data) strategyPerformance = mapped;
+      }
+    }
+
+    // 활성 전략에 아직 V2 스냅샷이 없더라도 패널이 사라지지 않도록
+    // 전체 전략 중 가장 최근에 생성된 V2 스냅샷을 fallback으로 사용합니다.
+    if (!strategyPerformance) {
+      const latestPerformanceResult = await supabase
+        .from("strategy_performance_snapshots")
+        .select("*")
+        .order("analyzed_at", { ascending: false })
+        .limit(20);
+
+      if (latestPerformanceResult.error) throw latestPerformanceResult.error;
+      const latestV2Row = (latestPerformanceResult.data ?? []).find((row) => {
+        const mapped = mapStrategyPerformance(row);
+        return (
+          mapped.average_holding_seconds !== null ||
+          mapped.side_performance.length > 0 ||
+          mapped.confidence_performance.length > 0 ||
+          mapped.exit_reason_performance.length > 0
+        );
+      });
+      if (latestV2Row) strategyPerformance = mapStrategyPerformance(latestV2Row);
+    }
+
     const decisionIds = new Set<number>();
     for (const position of positionsResult.data ?? []) {
       if (position.opening_decision_id) {
@@ -443,6 +593,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
       account,
       config,
       ...globalData,
+      strategyPerformance,
       openPositions,
       orders,
       trades,

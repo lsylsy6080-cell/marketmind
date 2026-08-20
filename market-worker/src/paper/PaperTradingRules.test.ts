@@ -1,7 +1,10 @@
 import {
+  calculatePositionReturnPercent,
   calculateUnrealizedPnl,
+  deriveProtectionThresholds,
   determineCloseReason,
   evaluateEntryEligibility,
+  updatePositionExcursion,
   validateStrategyConfig,
 } from "./PaperTradingRules";
 import type {
@@ -169,6 +172,31 @@ const tests: readonly TestCase[] = [
     },
   },
   {
+    name: "최대 보유 시점과 반대 신호가 겹치면 반대 신호를 우선 기록한다",
+    run: () => {
+      const result = determineCloseReason(
+        {
+          ...longPosition,
+          openedAt: "2026-07-31T03:30:00.000Z",
+        },
+        config,
+        {
+          ...bullishDecision,
+          finalScore: 24,
+          direction: "bearish",
+          action: "sell",
+        },
+        101_000,
+        30,
+        nowMs,
+      );
+      assert(
+        result === "opposite_signal",
+        "동시 충족 시 반대 신호가 max_holding에 가려졌습니다.",
+      );
+    },
+  },
+  {
     name: "오래된 반대 신호는 청산에 사용하지 않는다",
     run: () => {
       const result = determineCloseReason(
@@ -186,6 +214,62 @@ const tests: readonly TestCase[] = [
         nowMs,
       );
       assert(result === null, "오래된 반대 신호로 포지션을 청산했습니다.");
+    },
+  },
+  {
+    name: "MFE와 MAE를 포지션 방향 기준 수익률로 누적한다",
+    run: () => {
+      let excursion = updatePositionExcursion(
+        { mfePercent: 0, maePercent: 0 },
+        calculatePositionReturnPercent(longPosition, 101_200),
+      );
+      excursion = updatePositionExcursion(
+        excursion,
+        calculatePositionReturnPercent(longPosition, 99_500),
+      );
+
+      assert(Math.abs(excursion.mfePercent - 1.2) < 0.000001, "MFE 누적이 올바르지 않습니다.");
+      assert(Math.abs(excursion.maePercent - (-0.5)) < 0.000001, "MAE 누적이 올바르지 않습니다.");
+    },
+  },
+  {
+    name: "TP 목표 폭에 비례해 보호 청산 임계값을 산출한다",
+    run: () => {
+      const thresholds = deriveProtectionThresholds(longPosition);
+      assert(Math.abs(thresholds.targetReturnPercent - 4) < 0.000001, "TP 목표 수익률 계산이 틀렸습니다.");
+      assert(Math.abs(thresholds.breakEvenActivationPercent - 0.75) < 0.000001, "BE 활성 기준 상한이 틀렸습니다.");
+      assert(Math.abs(thresholds.trailingActivationPercent - 1.4) < 0.000001, "Trailing 활성 기준이 틀렸습니다.");
+      assert(Math.abs(thresholds.trailingGivebackPercent - 0.6) < 0.000001, "Trailing 반납 기준이 틀렸습니다.");
+    },
+  },
+  {
+    name: "충분한 MFE 뒤 수익을 반납하면 trailing_profit으로 청산한다",
+    run: () => {
+      const result = determineCloseReason(
+        longPosition,
+        config,
+        bullishDecision,
+        100_900,
+        30,
+        nowMs,
+        { mfePercent: 1.6, maePercent: -0.2 },
+      );
+      assert(result === "trailing_profit", "트레일링 수익 보호를 감지하지 못했습니다.");
+    },
+  },
+  {
+    name: "BE 활성 이후 수익을 거의 모두 반납하면 break_even으로 청산한다",
+    run: () => {
+      const result = determineCloseReason(
+        longPosition,
+        config,
+        bullishDecision,
+        100_040,
+        30,
+        nowMs,
+        { mfePercent: 0.8, maePercent: -0.1 },
+      );
+      assert(result === "break_even", "본전 보호 청산을 감지하지 못했습니다.");
     },
   },
   {

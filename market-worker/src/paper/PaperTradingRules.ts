@@ -3,6 +3,8 @@ export type PositionSide = "long" | "short";
 export type CloseReason =
   | "take_profit"
   | "stop_loss"
+  | "break_even"
+  | "trailing_profit"
   | "max_holding"
   | "opposite_signal";
 
@@ -38,6 +40,19 @@ export interface PaperPosition {
   openedAt: string;
 }
 
+export interface PositionExcursion {
+  mfePercent: number;
+  maePercent: number;
+}
+
+export interface ProtectionThresholds {
+  targetReturnPercent: number;
+  breakEvenActivationPercent: number;
+  breakEvenFloorPercent: number;
+  trailingActivationPercent: number;
+  trailingGivebackPercent: number;
+}
+
 export interface EntryEligibility {
   allowed: boolean;
   reason: string;
@@ -47,6 +62,10 @@ function assertFinite(value: number, label: string): void {
   if (!Number.isFinite(value)) {
     throw new Error(`${label} 값이 올바르지 않습니다.`);
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 export function elapsedMinutes(
@@ -172,6 +191,52 @@ export function evaluateEntryEligibility(
   };
 }
 
+export function calculatePositionReturnPercent(
+  position: PaperPosition,
+  marketPrice: number,
+): number {
+  assertFinite(marketPrice, "시장 가격");
+  if (marketPrice <= 0 || position.entryPrice <= 0) {
+    throw new Error("시장 가격과 진입 가격은 0보다 커야 합니다.");
+  }
+
+  return position.side === "long"
+    ? ((marketPrice / position.entryPrice) - 1) * 100
+    : ((position.entryPrice / marketPrice) - 1) * 100;
+}
+
+export function updatePositionExcursion(
+  previous: PositionExcursion,
+  currentReturnPercent: number,
+): PositionExcursion {
+  assertFinite(previous.mfePercent, "MFE");
+  assertFinite(previous.maePercent, "MAE");
+  assertFinite(currentReturnPercent, "현재 수익률");
+
+  return {
+    mfePercent: Math.max(0, previous.mfePercent, currentReturnPercent),
+    maePercent: Math.min(0, previous.maePercent, currentReturnPercent),
+  };
+}
+
+export function deriveProtectionThresholds(
+  position: PaperPosition,
+): ProtectionThresholds {
+  const targetReturnPercent = Math.abs(
+    calculatePositionReturnPercent(position, position.takeProfitPrice),
+  );
+
+  // Phase 6-2B: 전략별 기존 TP 폭을 기준으로 보호 청산 임계값을 자동 산출합니다.
+  // 약 3% TP 전략이라면 BE≈0.6%, Trail≈1.05%, Giveback≈0.45% 수준입니다.
+  return {
+    targetReturnPercent,
+    breakEvenActivationPercent: clamp(targetReturnPercent * 0.2, 0.35, 0.75),
+    breakEvenFloorPercent: 0.05,
+    trailingActivationPercent: clamp(targetReturnPercent * 0.35, 0.6, 1.5),
+    trailingGivebackPercent: clamp(targetReturnPercent * 0.15, 0.25, 0.75),
+  };
+}
+
 export function determineCloseReason(
   position: PaperPosition,
   config: PaperStrategyConfig,
@@ -179,6 +244,7 @@ export function determineCloseReason(
   marketPrice: number,
   decisionMaxAgeMinutes: number,
   nowMs = Date.now(),
+  excursion: PositionExcursion | null = null,
 ): CloseReason | null {
   validateStrategyConfig(config);
   assertFinite(marketPrice, "시장 가격");
@@ -200,35 +266,61 @@ export function determineCloseReason(
     if (marketPrice <= position.takeProfitPrice) return "take_profit";
   }
 
+  // Phase 6-2B: Hard SL/TP를 침범하지 않는 보호 청산.
+  // MFE가 충분히 쌓인 뒤 수익을 크게 반납하면 trailing_profit,
+  // 그보다 작은 선행 수익을 모두 반납하면 break_even으로 종료합니다.
+  if (excursion) {
+    const currentReturnPercent = calculatePositionReturnPercent(
+      position,
+      marketPrice,
+    );
+    const thresholds = deriveProtectionThresholds(position);
+
+    if (
+      excursion.mfePercent >= thresholds.trailingActivationPercent &&
+      currentReturnPercent <=
+        excursion.mfePercent - thresholds.trailingGivebackPercent
+    ) {
+      return "trailing_profit";
+    }
+
+    if (
+      excursion.mfePercent >= thresholds.breakEvenActivationPercent &&
+      currentReturnPercent <= thresholds.breakEvenFloorPercent
+    ) {
+      return "break_even";
+    }
+  }
+
+  // Phase 6-2: 가격 기반 SL/TP와 보호 청산 다음에는 유효한 반대 신호를 평가합니다.
+  const decisionIsUsable =
+    decision !== null &&
+    elapsedMinutes(decision.decidedAt, nowMs) <= decisionMaxAgeMinutes &&
+    decision.tradingPermission !== "blocked" &&
+    decision.finalConfidence >= config.confidenceMin;
+
+  if (decisionIsUsable && decision) {
+    if (
+      position.side === "long" &&
+      decision.direction === "bearish" &&
+      decision.action === "sell" &&
+      decision.finalScore <= config.shortScoreMax
+    ) {
+      return "opposite_signal";
+    }
+
+    if (
+      position.side === "short" &&
+      decision.direction === "bullish" &&
+      (decision.action === "strong_buy" || decision.action === "buy") &&
+      decision.finalScore >= config.longScoreMin
+    ) {
+      return "opposite_signal";
+    }
+  }
+
   if (elapsedMinutes(position.openedAt, nowMs) >= config.maxHoldingMinutes) {
     return "max_holding";
-  }
-
-  if (
-    !decision ||
-    elapsedMinutes(decision.decidedAt, nowMs) > decisionMaxAgeMinutes ||
-    decision.tradingPermission === "blocked" ||
-    decision.finalConfidence < config.confidenceMin
-  ) {
-    return null;
-  }
-
-  if (
-    position.side === "long" &&
-    decision.direction === "bearish" &&
-    decision.action === "sell" &&
-    decision.finalScore <= config.shortScoreMax
-  ) {
-    return "opposite_signal";
-  }
-
-  if (
-    position.side === "short" &&
-    decision.direction === "bullish" &&
-    (decision.action === "strong_buy" || decision.action === "buy") &&
-    decision.finalScore >= config.longScoreMin
-  ) {
-    return "opposite_signal";
   }
 
   return null;

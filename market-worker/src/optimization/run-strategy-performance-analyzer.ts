@@ -26,11 +26,22 @@ interface TradeRow {
   net_pnl: number | string;
   return_percent: number | string;
   closed_at: string;
+  side: "long" | "short" | null;
+  entry_confidence: number | string | null;
+  holding_seconds: number | string | null;
+  close_reason: string | null;
+  mfe_percent: number | string | null;
+  mae_percent: number | string | null;
 }
 
 interface LatestSnapshotRow {
   total_trades: number;
   last_trade_id: number | null;
+  average_holding_seconds: number | string | null;
+  side_performance: Record<string, unknown> | null;
+  confidence_performance: Record<string, unknown> | null;
+  exit_reason_performance: Record<string, unknown> | null;
+  excursion_metrics: Record<string, unknown> | null;
 }
 
 function toFiniteNumber(value: number | string, label: string): number {
@@ -50,6 +61,24 @@ function mapTrade(row: TradeRow): ClosedTradeSample {
       `trade_id=${row.id} return_percent`,
     ),
     closedAt: row.closed_at,
+    side: row.side,
+    entryConfidence:
+      row.entry_confidence == null
+        ? null
+        : toFiniteNumber(row.entry_confidence, `trade_id=${row.id} entry_confidence`),
+    holdingSeconds:
+      row.holding_seconds == null
+        ? null
+        : toFiniteNumber(row.holding_seconds, `trade_id=${row.id} holding_seconds`),
+    closeReason: row.close_reason,
+    mfePercent:
+      row.mfe_percent == null
+        ? null
+        : toFiniteNumber(row.mfe_percent, `trade_id=${row.id} mfe_percent`),
+    maePercent:
+      row.mae_percent == null
+        ? null
+        : toFiniteNumber(row.mae_percent, `trade_id=${row.id} mae_percent`),
   };
 }
 
@@ -84,7 +113,7 @@ async function getClosedTrades(
 ): Promise<ClosedTradeSample[]> {
   const { data, error } = await supabase
     .from("paper_trades")
-    .select("id, net_pnl, return_percent, closed_at")
+    .select("id, net_pnl, return_percent, closed_at, side, entry_confidence, holding_seconds, close_reason, mfe_percent, mae_percent")
     .eq("account_id", config.account_id)
     .eq("symbol", config.symbol)
     .not("closed_at", "is", null)
@@ -105,7 +134,7 @@ async function getLatestSnapshot(
 ): Promise<LatestSnapshotRow | null> {
   const { data, error } = await supabase
     .from("strategy_performance_snapshots")
-    .select("total_trades, last_trade_id")
+    .select("total_trades, last_trade_id, average_holding_seconds, side_performance, confidence_performance, exit_reason_performance, excursion_metrics")
     .eq("strategy_config_id", configId)
     .order("analyzed_at", { ascending: false })
     .limit(1)
@@ -158,6 +187,13 @@ function buildSnapshot(
     max_drawdown_percent: metrics.maxDrawdownPercent,
     consecutive_wins_max: metrics.consecutiveWinsMax,
     consecutive_losses_max: metrics.consecutiveLossesMax,
+    average_holding_seconds: metrics.holdingTime.averageSeconds,
+    min_holding_seconds: metrics.holdingTime.minSeconds,
+    max_holding_seconds: metrics.holdingTime.maxSeconds,
+    side_performance: metrics.sidePerformance,
+    confidence_performance: metrics.confidencePerformance,
+    exit_reason_performance: metrics.exitReasonPerformance,
+    excursion_metrics: metrics.excursion,
     sample_status: metrics.sampleStatus,
     optimization_eligible: metrics.optimizationEligible,
     trades_until_provisional: metrics.tradesUntilProvisional,
@@ -174,11 +210,34 @@ async function analyzeOneConfig(config: StrategyConfigRow): Promise<{
   metrics: StrategyPerformanceMetrics;
 }> {
   const trades = await getClosedTrades(config);
-  const metrics = analyzeStrategyPerformance(trades);
+  const metrics = analyzeStrategyPerformance(
+    trades,
+    undefined,
+    {
+      takeProfitPercent: toFiniteNumber(
+        config.take_profit_percent,
+        "익절 비율",
+      ),
+      stopLossPercent: toFiniteNumber(
+        config.stop_loss_percent,
+        "손절 비율",
+      ),
+    },
+  );
   const latest = await getLatestSnapshot(config.id);
+
+  const hasV2Analytics =
+    latest != null &&
+    latest.side_performance != null &&
+    latest.confidence_performance != null &&
+    latest.exit_reason_performance != null &&
+    latest.excursion_metrics != null &&
+    (metrics.holdingTime.averageSeconds == null ||
+      latest.average_holding_seconds != null);
 
   if (
     latest &&
+    hasV2Analytics &&
     Number(latest.total_trades) === metrics.totalTrades &&
     Number(latest.last_trade_id ?? 0) === Number(metrics.lastTradeId ?? 0)
   ) {
@@ -197,7 +256,7 @@ async function analyzeOneConfig(config: StrategyConfigRow): Promise<{
 }
 
 export async function runStrategyPerformanceAnalyzer(): Promise<void> {
-  console.log("[Strategy Performance] Phase 5-1 분석 시작");
+  console.log("[Strategy Performance] Phase 6-2C MFE/MAE 통계 분석 시작");
   const configs = await getActiveConfigs();
 
   if (configs.length === 0) {
@@ -218,7 +277,10 @@ export async function runStrategyPerformanceAnalyzer(): Promise<void> {
       console.log(
         `[Strategy Performance] config=${config.id} trades=${result.metrics.totalTrades} ` +
           `status=${result.metrics.sampleStatus} winRate=${result.metrics.winRate ?? "N/A"} ` +
-          `profitFactor=${result.metrics.profitFactor ?? "N/A"}`,
+          `profitFactor=${result.metrics.profitFactor ?? "N/A"} ` +
+          `avgHold=${result.metrics.holdingTime.averageSeconds ?? "N/A"}s ` +
+          `MFEavg=${result.metrics.excursion.averageMfePercent ?? "N/A"}% ` +
+          `MAEavg=${result.metrics.excursion.averageMaePercent ?? "N/A"}%`,
       );
     } catch (error: unknown) {
       failed += 1;
@@ -229,7 +291,7 @@ export async function runStrategyPerformanceAnalyzer(): Promise<void> {
     }
   }
 
-  console.log("[Strategy Performance] Phase 5-1 분석 완료", {
+  console.log("[Strategy Performance] Phase 6-2C MFE/MAE 통계 분석 완료", {
     strategies: configs.length,
     saved,
     unchanged,

@@ -15,6 +15,30 @@ function pnlForPosition(position: PaperPosition, marketPrice: number | null) {
   return { pnl, roi: notional > 0 ? (pnl / notional) * 100 : 0 };
 }
 
+function secondsLabel(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+  const totalMinutes = Math.max(0, Math.round(value / 60));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `${days}일 ${hours}시간`;
+  if (hours > 0) return `${hours}시간 ${minutes}분`;
+  return `${minutes}분`;
+}
+
+function closeReasonLabel(value: string | undefined) {
+  const labels: Record<string, string> = {
+    take_profit: "익절",
+    stop_loss: "손절",
+    max_holding: "최대 보유시간",
+    opposite_signal: "반대 신호",
+    signal_exit: "신호 청산",
+    timeout: "시간 종료",
+    manual: "수동 청산",
+  };
+  return value ? (labels[value] ?? value) : "기타";
+}
+
 function durationLabel(openedAt: string) {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(openedAt).getTime()) / 60000));
   const hours = Math.floor(minutes / 60);
@@ -113,7 +137,7 @@ export function PaperTradingDashboard({ data }: { data: PaperTradingData }) {
   if (data.error) return <section className="panel paper-notice"><strong>Paper Trading 데이터를 불러오지 못했습니다.</strong><span>{data.error}</span></section>;
   if (!data.account) return <section className="panel paper-notice"><strong>Paper Trading 계정이 없습니다.</strong><span>010-paper-trading-v1.sql 실행 여부를 확인해주세요.</span></section>;
 
-  const { account, config, openPositions, trades, runs, marketPrice } = data;
+  const { account, config, openPositions, trades, runs, marketPrice, strategyPerformance } = data;
   const unrealized = openPositions.reduce((sum, position) => sum + pnlForPosition(position, marketPrice).pnl, 0);
   const equity = account.cash_balance + openPositions.reduce((sum, position) => sum + position.entry_price * position.quantity, 0) + unrealized;
   const totalPnl = account.realized_pnl + unrealized;
@@ -179,6 +203,23 @@ export function PaperTradingDashboard({ data }: { data: PaperTradingData }) {
     <article className="panel paper-holdings"><h2>유지 중인 포지션 <small>실제 보유 포지션</small></h2><div className="paper-table-wrap"><table><thead><tr><th>종목</th><th>방향</th><th>진입 가격</th><th>현재 가격</th><th>수량</th><th>미실현 PnL</th><th>ROI</th><th>진입 시간</th><th>보유 시간</th><th>TP</th><th>SL</th><th>상태</th></tr></thead><tbody>{openPositions.length ? openPositions.map((position)=>{const p=pnlForPosition(position,marketPrice);return <tr key={position.id}><td>{position.symbol}</td><td><b className={`paper-side ${position.side}`}>{position.side === "long" ? "롱" : "숏"}</b></td><td>{formatPrice(position.entry_price)}</td><td>{formatPrice(marketPrice)}</td><td>{formatNumber(position.quantity,8)}</td><td className={p.pnl>=0?"paper-positive":"paper-negative"}>{signed(p.pnl)}</td><td className={p.roi>=0?"paper-positive":"paper-negative"}>{formatPercent(p.roi)}</td><td>{formatDateTime(position.opened_at)}</td><td>{durationLabel(position.opened_at)}</td><td>{formatPrice(position.take_profit_price)}</td><td>{formatPrice(position.stop_loss_price)}</td><td><b className="paper-status held">보유 중</b></td></tr>}) : <tr><td colSpan={12}>현재 유지 중인 포지션이 없습니다.</td></tr>}</tbody></table></div></article>
 
     <div className="paper-bottom-grid"><article className="panel paper-trades"><h2>최근 거래 내역</h2><div className="paper-table-wrap"><table><thead><tr><th>청산 시간</th><th>종목</th><th>방향</th><th>진입가</th><th>청산가</th><th>수량</th><th>수수료</th><th>PnL</th><th>수익률</th><th>유형</th></tr></thead><tbody>{trades.slice(0,8).map((trade)=><tr key={trade.id}><td>{formatDateTime(trade.closed_at)}</td><td>{trade.symbol}</td><td><b className={`paper-side ${trade.side}`}>{trade.side === "long" ? "롱" : "숏"}</b></td><td>{formatPrice(trade.entry_price)}</td><td>{formatPrice(trade.exit_price)}</td><td>{formatNumber(trade.quantity,8)}</td><td>{formatNumber(trade.fees,4)}</td><td className={trade.net_pnl>=0?"paper-positive":"paper-negative"}>{signed(trade.net_pnl)}</td><td className={trade.return_percent>=0?"paper-positive":"paper-negative"}>{formatPercent(trade.return_percent)}</td><td>{trade.close_reason}</td></tr>)}</tbody></table></div></article><article className="panel paper-performance"><h2>성과 요약</h2><EquityChart data={data.equity} initialBalance={account.initial_balance}/><div className="paper-performance-values"><span>누적 수익률 <b className={totalPnl>=0?"paper-positive":"paper-negative"}>{formatPercent(totalPnl/account.initial_balance*100)}</b></span><span>총 실현 손익 <b className={account.realized_pnl>=0?"paper-positive":"paper-negative"}>{signed(account.realized_pnl)} USDT</b></span><span>평균 수익률 <b>{formatPercent(avgReturn)}</b></span><span>수익 팩터 <b>{formatNumber(profitFactor,2)}</b></span></div></article></div>
+
+    {strategyPerformance ? <section className="panel paper-analytics-v2">
+      <div className="paper-analytics-head"><div><h2>전략 성과 분석 <small>Phase 6-1 V2</small></h2><p>최신 성과 스냅샷 · {formatRelativeTime(strategyPerformance.analyzed_at)}</p></div><span className={`paper-sample-status ${strategyPerformance.sample_status}`}>{strategyPerformance.sample_status === "ready" ? "검증 준비" : strategyPerformance.sample_status === "provisional" ? "검증 중" : "표본 수집 중"}</span></div>
+      <div className="paper-analytics-kpis">
+        <div><span>승률</span><strong>{strategyPerformance.win_rate === null ? "—" : `${formatNumber(strategyPerformance.win_rate, 2)}%`}</strong><small>{strategyPerformance.winning_trades}승 / {strategyPerformance.losing_trades}패</small></div>
+        <div><span>Profit Factor</span><strong>{strategyPerformance.profit_factor === null ? "—" : formatNumber(strategyPerformance.profit_factor, 2)}</strong><small>1.0 이상이면 총이익 우위</small></div>
+        <div><span>평균 보유시간</span><strong>{secondsLabel(strategyPerformance.average_holding_seconds)}</strong><small>최대 {secondsLabel(strategyPerformance.max_holding_seconds)}</small></div>
+        <div><span>순손익</span><strong className={strategyPerformance.net_pnl >= 0 ? "paper-positive" : "paper-negative"}>{signed(strategyPerformance.net_pnl)} USDT</strong><small>평균 수익률 {strategyPerformance.average_return_percent === null ? "—" : formatPercent(strategyPerformance.average_return_percent)}</small></div>
+        <div><span>MDD</span><strong className="paper-negative">{strategyPerformance.max_drawdown_percent === null ? "—" : formatPercent(-Math.abs(strategyPerformance.max_drawdown_percent))}</strong><small>최대 낙폭</small></div>
+      </div>
+      <div className="paper-analytics-grid">
+        <article><h3>LONG / SHORT 성과</h3><div className="paper-analysis-table"><div className="head"><span>방향</span><span>거래</span><span>승률</span><span>순손익</span><span>PF</span></div>{strategyPerformance.side_performance.map((row)=><div key={row.side ?? "side"}><span><b className={`paper-side ${row.side ?? "long"}`}>{row.side === "short" ? "숏" : "롱"}</b></span><span>{row.totalTrades}</span><span>{row.winRate === null ? "—" : `${formatNumber(row.winRate,1)}%`}</span><span className={row.netPnl >= 0 ? "paper-positive" : "paper-negative"}>{signed(row.netPnl)}</span><span>{row.profitFactor === null ? "—" : formatNumber(row.profitFactor,2)}</span></div>)}</div></article>
+        <article><h3>Confidence 구간별 성과</h3><div className="paper-analysis-table"><div className="head"><span>구간</span><span>거래</span><span>승률</span><span>평균수익</span><span>PF</span></div>{strategyPerformance.confidence_performance.map((row)=><div key={row.bucket ?? "bucket"} className={row.totalTrades === 0 ? "muted" : ""}><span>{row.bucket ?? "—"}</span><span>{row.totalTrades}</span><span>{row.winRate === null ? "—" : `${formatNumber(row.winRate,1)}%`}</span><span className={(row.averageReturnPercent ?? 0) >= 0 ? "paper-positive" : "paper-negative"}>{row.averageReturnPercent === null ? "—" : formatPercent(row.averageReturnPercent)}</span><span>{row.profitFactor === null ? "—" : formatNumber(row.profitFactor,2)}</span></div>)}</div></article>
+        <article><h3>청산 사유별 성과</h3><div className="paper-exit-reasons">{strategyPerformance.exit_reason_performance.length ? strategyPerformance.exit_reason_performance.map((row)=><div key={row.reason ?? "reason"}><span><b>{closeReasonLabel(row.reason)}</b><small>{row.totalTrades}건 · 승률 {row.winRate === null ? "—" : `${formatNumber(row.winRate,1)}%`}</small></span><strong className={row.netPnl >= 0 ? "paper-positive" : "paper-negative"}>{signed(row.netPnl)} USDT</strong></div>) : <p>청산 데이터가 아직 없습니다.</p>}</div></article>
+      </div>
+      <div className="paper-sample-progress"><div><span>현재 {strategyPerformance.total_trades}건</span><span>Provisional까지 {strategyPerformance.trades_until_provisional}건 · Ready까지 {strategyPerformance.trades_until_ready}건</span></div><i><b style={{width:`${Math.min(100, (strategyPerformance.total_trades / 50) * 100)}%`}}/></i></div>
+    </section> : null}
 
     <article className="panel paper-recent-decisions"><h2>최근 AI 판단 목록 <small>최근 10건</small></h2><div className="paper-table-wrap"><table><thead><tr><th>판단 시간</th><th>최종 신호</th><th>점수</th><th>신뢰도</th><th>시장 국면</th><th>추천 전략</th><th>거래 권한</th></tr></thead><tbody>{runs.slice(0,10).map((run)=>{const d=run.decision_id?data.decisionsById[run.decision_id]:undefined;return <tr key={`decision-${run.id}`}><td>{formatDateTime(run.created_at)}</td><td><b className={`paper-signal ${d?.action ?? "hold"}`}>{koAction(d?.action)}</b></td><td><strong className="paper-score-value">{formatNumber(d?.final_score ?? null,1)}</strong></td><td><strong className="paper-confidence-value">{formatPercent(d?.final_confidence ?? null)}</strong></td><td><span className="paper-regime-badge">{koRegime(d?.market_regime)}</span></td><td>{d?.direction === "bullish" ? "분할 매수 전략" : d?.direction === "bearish" ? "분할 매도 전략" : "관망 전략"}</td><td><b className={`paper-permission ${d?.trading_permission ?? "unknown"}`}>{koPermission(d?.trading_permission)}</b></td></tr>})}</tbody></table></div></article>
 

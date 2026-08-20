@@ -13,12 +13,6 @@ const COIN_ICONS: Record<string, string> = {
   BTC: "/assets/coins/btc.png",
 };
 
-const SYMBOLS = [
-  { symbol: "BTCUSDT", label: "BTC", enabled: true },
-  { symbol: "ETHUSDT", label: "ETH", enabled: false },
-  { symbol: "SOLUSDT", label: "SOL", enabled: false },
-  { symbol: "XRPUSDT", label: "XRP", enabled: false },
-];
 
 function getCoinIcon(symbol: string): string {
   return COIN_ICONS[symbol.toUpperCase()] ?? "/assets/coins/btc.png";
@@ -59,27 +53,7 @@ export function MarketTicker({
           </span>
         </div>
 
-        <div className="symbol-switcher" aria-label="심볼 선택">
-          {SYMBOLS.map((item) => (
-            <button
-              key={item.symbol}
-              type="button"
-              disabled={!item.enabled}
-              className={
-                item.symbol === decision.symbol
-                  ? "symbol-chip active"
-                  : "symbol-chip"
-              }
-              title={
-                item.enabled
-                  ? `${item.label} 활성`
-                  : `${item.label}은 멀티 심볼 Worker 연결 후 활성화됩니다.`
-              }
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+
       </div>
 
       <div className="ticker-item">
@@ -88,12 +62,6 @@ export function MarketTicker({
         <small className="positive-text">
           {normalizeLabel(decision.direction)}
         </small>
-      </div>
-
-      <div className="ticker-item">
-        <span>Index Price</span>
-        <strong>${formatPrice(funding?.index_price ?? null)}</strong>
-        <small>시장 기준 가격</small>
       </div>
 
       <div className="ticker-item">

@@ -16,26 +16,20 @@ export type ProjectHealthData = {
 
 const fallbackServices: DevelopmentService[] = [
   {
-    name: "API",
-    description: "시장 데이터 및 분석 API",
-    status: "warning",
-    detail: "상태 확인 실패",
-  },
-  {
     name: "데이터베이스",
-    description: "시장·뉴스·분석 데이터 저장소",
+    description: "Vercel과 Supabase 연결 상태",
     status: "warning",
     detail: "상태 확인 실패",
   },
   {
-    name: "수집 워커",
-    description: "펀딩비·ETF·뉴스 수집 프로세스",
+    name: "Market Worker",
+    description: "외부 워커의 최근 BTC 캔들 저장 상태",
     status: "warning",
     detail: "상태 확인 실패",
   },
   {
     name: "AI 분석",
-    description: "시장 인텔리전스 분석 엔진",
+    description: "최근 AI Decision 생성 상태",
     status: "warning",
     detail: "상태 확인 실패",
   },

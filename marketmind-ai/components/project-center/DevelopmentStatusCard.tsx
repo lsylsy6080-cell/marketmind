@@ -18,28 +18,22 @@ type DevelopmentStatusCardProps = {
 
 const defaultServices: DevelopmentService[] = [
   {
-    name: "API",
-    description: "시장 데이터 및 분석 API",
-    status: "developing",
-    detail: "상태 API 연결 대기",
-  },
-  {
     name: "데이터베이스",
-    description: "시장·뉴스·분석 데이터 저장소",
+    description: "Vercel과 Supabase 연결 상태",
     status: "developing",
-    detail: "상태 API 연결 대기",
+    detail: "상태 확인 대기",
   },
   {
-    name: "수집 워커",
-    description: "펀딩비·ETF·뉴스 수집 프로세스",
+    name: "Market Worker",
+    description: "외부 워커의 최근 BTC 캔들 저장 상태",
     status: "developing",
-    detail: "상태 API 연결 대기",
+    detail: "상태 확인 대기",
   },
   {
     name: "AI 분석",
-    description: "시장 인텔리전스 분석 엔진",
+    description: "최근 AI Decision 생성 상태",
     status: "developing",
-    detail: "상태 API 연결 대기",
+    detail: "상태 확인 대기",
   },
 ];
 
@@ -84,8 +78,8 @@ export function DevelopmentStatusCard({
 
       <div className={styles.cardHeader}>
         <div>
-          <span className={styles.cardEyebrow}>SYSTEM HEALTH</span>
-          <h2 id="development-status-title">실시간 시스템 상태</h2>
+          <span className={styles.cardEyebrow}>LIVE SYSTEM HEALTH</span>
+          <h2 id="development-status-title">운영 상태</h2>
         </div>
 
         <span className={styles.healthSummary}>

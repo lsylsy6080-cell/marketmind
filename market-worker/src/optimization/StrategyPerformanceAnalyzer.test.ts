@@ -113,3 +113,140 @@ for (const test of tests) {
 }
 
 console.log(`[DONE] Strategy Performance Analyzer ${tests.length}개 검증 통과`);
+
+const v2Trades: ClosedTradeSample[] = [
+  {
+    id: 101,
+    netPnl: 10,
+    returnPercent: 1,
+    closedAt: "2026-08-01T01:00:00Z",
+    side: "long",
+    entryConfidence: 82,
+    holdingSeconds: 600,
+    closeReason: "take_profit",
+    mfePercent: 3.4,
+    maePercent: -0.3,
+  },
+  {
+    id: 102,
+    netPnl: -4,
+    returnPercent: -0.4,
+    closedAt: "2026-08-01T02:00:00Z",
+    side: "long",
+    entryConfidence: 78,
+    holdingSeconds: 1200,
+    closeReason: "stop_loss",
+    mfePercent: 0.4,
+    maePercent: -1.8,
+  },
+  {
+    id: 103,
+    netPnl: 8,
+    returnPercent: 0.8,
+    closedAt: "2026-08-01T03:00:00Z",
+    side: "short",
+    entryConfidence: 91,
+    holdingSeconds: 900,
+    closeReason: "take_profit",
+    mfePercent: 1.4,
+    maePercent: -0.2,
+  },
+];
+
+{
+  const result = analyzeStrategyPerformance(v2Trades);
+  const long = result.sidePerformance.find((item) => item.side === "long");
+  const short = result.sidePerformance.find((item) => item.side === "short");
+  assert(long?.totalTrades === 2, "V2 LONG 거래 수 오류");
+  assertClose(long?.winRate ?? null, 50, "V2 LONG 승률 오류");
+  assert(short?.totalTrades === 1, "V2 SHORT 거래 수 오류");
+  assertClose(result.holdingTime.averageSeconds, 900, "V2 평균 보유시간 오류");
+  assert(result.holdingTime.minSeconds === 600, "V2 최소 보유시간 오류");
+  assert(result.holdingTime.maxSeconds === 1200, "V2 최대 보유시간 오류");
+
+  const bucket80 = result.confidencePerformance.find(
+    (item) => item.bucket === "80-89",
+  );
+  const bucket90 = result.confidencePerformance.find(
+    (item) => item.bucket === "90-100",
+  );
+  assert(bucket80?.totalTrades === 1, "V2 Confidence 80-89 집계 오류");
+  assert(bucket90?.totalTrades === 1, "V2 Confidence 90-100 집계 오류");
+
+  const takeProfit = result.exitReasonPerformance.find(
+    (item) => item.reason === "take_profit",
+  );
+  assert(takeProfit?.totalTrades === 2, "V2 익절 사유 집계 오류");
+  assertClose(takeProfit?.winRate ?? null, 100, "V2 익절 사유 승률 오류");
+}
+console.log("[PASS] V2 방향·보유시간·Confidence·청산사유 분석");
+
+
+{
+  const result = analyzeStrategyPerformance(
+    [
+      {
+        id: 201,
+        netPnl: 5,
+        returnPercent: 0.5,
+        closedAt: "2026-08-02T01:00:00Z",
+        mfePercent: 0.2,
+        maePercent: -0.1,
+      },
+      {
+        id: 202,
+        netPnl: 7,
+        returnPercent: 0.7,
+        closedAt: "2026-08-02T02:00:00Z",
+        mfePercent: 0.8,
+        maePercent: -0.4,
+      },
+      {
+        id: 203,
+        netPnl: -8,
+        returnPercent: -0.8,
+        closedAt: "2026-08-02T03:00:00Z",
+        mfePercent: 1.2,
+        maePercent: -1.6,
+      },
+      {
+        id: 204,
+        netPnl: 12,
+        returnPercent: 1.2,
+        closedAt: "2026-08-02T04:00:00Z",
+        mfePercent: 3.2,
+        maePercent: -0.2,
+      },
+    ],
+    undefined,
+    { takeProfitPercent: 3, stopLossPercent: 1.5 },
+  );
+
+  assert(result.excursion.samples === 4, "6-2C MFE/MAE 표본 수 오류");
+  assertClose(result.excursion.averageMfePercent, 1.35, "6-2C 평균 MFE 오류");
+  assertClose(result.excursion.medianMfePercent, 1, "6-2C 중앙 MFE 오류");
+  assertClose(result.excursion.averageMaePercent, -0.575, "6-2C 평균 MAE 오류");
+  assert(result.excursion.tpReachTrades === 1, "6-2C TP 도달 거래 수 오류");
+  assertClose(result.excursion.tpReachRate, 25, "6-2C TP 도달률 오류");
+  assert(result.excursion.slReachTrades === 1, "6-2C SL 도달 거래 수 오류");
+  assertClose(result.excursion.slReachRate, 25, "6-2C SL 도달률 오류");
+  assert(
+    result.excursion.breakEvenOpportunityTrades === 3,
+    "6-2C BE 활성 기회 집계 오류",
+  );
+  assert(
+    result.excursion.trailingOpportunityTrades === 2,
+    "6-2C Trailing 활성 기회 집계 오류",
+  );
+
+  const mfeHalfToOne = result.excursion.mfeDistribution.find(
+    (item) => item.bucket === "0.5-1.0",
+  );
+  assert(mfeHalfToOne?.trades === 1, "6-2C MFE 분포 오류");
+
+  const maeOneToTwo = result.excursion.maeDistribution.find(
+    (item) => item.bucket === "1.0-2.0",
+  );
+  assert(maeOneToTwo?.trades === 1, "6-2C MAE 분포 오류");
+}
+console.log("[PASS] 6-2C MFE/MAE 통계·목표 도달률·분포 분석");

@@ -252,6 +252,91 @@ export type PaperTrade = {
   closed_at: string;
 };
 
+export type StrategyPerformanceSlice = {
+  side?: "long" | "short";
+  bucket?: string;
+  reason?: string;
+  minConfidence?: number;
+  maxConfidence?: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  breakevenTrades: number;
+  winRate: number | null;
+  netPnl: number;
+  averagePnl: number | null;
+  averageReturnPercent: number | null;
+  profitFactor: number | null;
+};
+
+export type ExcursionDistributionBucket = {
+  bucket: string;
+  trades: number;
+  rate: number | null;
+  minPercent: number;
+  maxPercent: number | null;
+};
+
+export type StrategyExcursionMetrics = {
+  samples: number;
+  averageMfePercent: number | null;
+  medianMfePercent: number | null;
+  p25MfePercent: number | null;
+  p75MfePercent: number | null;
+  maxMfePercent: number | null;
+  averageMaePercent: number | null;
+  medianMaePercent: number | null;
+  p25MaePercent: number | null;
+  p75MaePercent: number | null;
+  minMaePercent: number | null;
+  tpTargetPercent: number | null;
+  slTargetPercent: number | null;
+  tpReachTrades: number;
+  slReachTrades: number;
+  tpReachRate: number | null;
+  slReachRate: number | null;
+  breakEvenActivationPercent: number | null;
+  trailingActivationPercent: number | null;
+  breakEvenOpportunityTrades: number;
+  trailingOpportunityTrades: number;
+  breakEvenOpportunityRate: number | null;
+  trailingOpportunityRate: number | null;
+  mfeDistribution: ExcursionDistributionBucket[];
+  maeDistribution: ExcursionDistributionBucket[];
+};
+
+export type StrategyPerformanceSnapshot = {
+  id: number;
+  strategy_config_id: number;
+  account_id: number;
+  symbol: string;
+  strategy_version: string | null;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  breakeven_trades: number;
+  win_rate: number | null;
+  net_pnl: number;
+  average_return_percent: number | null;
+  average_win: number | null;
+  average_loss: number | null;
+  profit_factor: number | null;
+  max_drawdown: number | null;
+  max_drawdown_percent: number | null;
+  average_holding_seconds: number | null;
+  min_holding_seconds: number | null;
+  max_holding_seconds: number | null;
+  side_performance: StrategyPerformanceSlice[];
+  confidence_performance: StrategyPerformanceSlice[];
+  exit_reason_performance: StrategyPerformanceSlice[];
+  excursion_metrics: StrategyExcursionMetrics | null;
+  sample_status: string;
+  optimization_eligible: boolean;
+  trades_until_provisional: number;
+  trades_until_ready: number;
+  analyzed_at: string;
+};
+
 export type PaperStrategyRun = {
   id: number;
   account_id: number | null;
@@ -281,6 +366,7 @@ export type PaperTradingData = {
   funding: FundingSnapshot | null;
   backtestSummary: BacktestSummary;
   performanceSummary: PerformanceSummary;
+  strategyPerformance: StrategyPerformanceSnapshot | null;
   openPositions: PaperPosition[];
   orders: PaperOrder[];
   trades: PaperTrade[];

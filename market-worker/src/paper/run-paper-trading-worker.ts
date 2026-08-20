@@ -1,8 +1,12 @@
 import { supabase } from "../lib/supabase";
 import {
+  calculatePositionReturnPercent,
   calculateUnrealizedPnl,
+  deriveProtectionThresholds,
   determineCloseReason,
+  elapsedMinutes,
   evaluateEntryEligibility,
+  updatePositionExcursion,
   validateStrategyConfig,
 } from "./PaperTradingRules";
 import type {
@@ -11,6 +15,7 @@ import type {
   PaperDecision,
   PaperPosition,
   PaperStrategyConfig,
+  PositionExcursion,
   PositionSide,
   TradingPermission,
 } from "./PaperTradingRules";
@@ -57,6 +62,14 @@ interface OpenPositionRow {
   stop_loss_price: number | string;
   take_profit_price: number | string;
   opened_at: string;
+  entry_final_score: number | string | null;
+  entry_confidence: number | string | null;
+  entry_direction: DecisionDirection | null;
+  entry_action: DecisionAction | null;
+  entry_trading_permission: TradingPermission | null;
+  decision_snapshot: Record<string, unknown> | null;
+  mfe_percent: number | string | null;
+  mae_percent: number | string | null;
 }
 
 interface RpcResult {
@@ -135,6 +148,48 @@ function mapPosition(row: OpenPositionRow): PaperPosition {
     takeProfitPrice: toFiniteNumber(row.take_profit_price, "익절 가격"),
     openedAt: row.opened_at,
   };
+}
+
+function mapExcursion(row: OpenPositionRow): PositionExcursion {
+  return {
+    mfePercent: row.mfe_percent == null ? 0 : toFiniteNumber(row.mfe_percent, "MFE"),
+    maePercent: row.mae_percent == null ? 0 : toFiniteNumber(row.mae_percent, "MAE"),
+  };
+}
+
+async function trackPositionExcursion(params: {
+  positionRow: OpenPositionRow;
+  marketPrice: number;
+}): Promise<PositionExcursion> {
+  const position = mapPosition(params.positionRow);
+  const currentReturnPercent = calculatePositionReturnPercent(
+    position,
+    params.marketPrice,
+  );
+  const next = updatePositionExcursion(
+    mapExcursion(params.positionRow),
+    currentReturnPercent,
+  );
+
+  const changed =
+    next.mfePercent !== mapExcursion(params.positionRow).mfePercent ||
+    next.maePercent !== mapExcursion(params.positionRow).maePercent;
+
+  if (changed) {
+    const { error } = await supabase
+      .from("paper_positions")
+      .update({
+        mfe_percent: round(next.mfePercent, 6),
+        mae_percent: round(next.maePercent, 6),
+      })
+      .eq("id", params.positionRow.id);
+
+    if (error) {
+      throw new Error(`MFE/MAE 갱신 실패: ${error.message}`);
+    }
+  }
+
+  return next;
 }
 
 async function fetchBinancePrice(symbol: string): Promise<number> {
@@ -251,7 +306,15 @@ async function getOpenPosition(
       entry_price,
       stop_loss_price,
       take_profit_price,
-      opened_at
+      opened_at,
+      entry_final_score,
+      entry_confidence,
+      entry_direction,
+      entry_action,
+      entry_trading_permission,
+      decision_snapshot,
+      mfe_percent,
+      mae_percent
     `)
     .eq("account_id", accountId)
     .eq("symbol", symbol)
@@ -264,6 +327,97 @@ async function getOpenPosition(
   }
 
   return (data as OpenPositionRow | null) ?? null;
+}
+
+function buildDecisionSnapshot(
+  row: FinalDecisionRow,
+): Record<string, unknown> {
+  return {
+    decisionId: row.id,
+    symbol: row.symbol,
+    decidedAt: row.decided_at,
+    finalScore: toFiniteNumber(row.final_score, "최종 점수"),
+    finalConfidence: toFiniteNumber(row.final_confidence, "최종 신뢰도"),
+    direction: row.direction,
+    action: row.action,
+    tradingPermission: row.trading_permission,
+  };
+}
+
+async function attachEntryDecisionMetadata(params: {
+  positionId: number;
+  decision: FinalDecisionRow;
+}): Promise<void> {
+  const snapshot = buildDecisionSnapshot(params.decision);
+
+  const { error } = await supabase
+    .from("paper_positions")
+    .update({
+      entry_final_score: snapshot.finalScore,
+      entry_confidence: snapshot.finalConfidence,
+      entry_direction: params.decision.direction,
+      entry_action: params.decision.action,
+      entry_trading_permission: params.decision.trading_permission,
+      decision_snapshot: snapshot,
+    })
+    .eq("id", params.positionId);
+
+  if (error) {
+    throw new Error(`v3-1 진입 판단 스냅샷 저장 실패: ${error.message}`);
+  }
+}
+
+async function attachTradeAuditMetadata(params: {
+  position: OpenPositionRow;
+  closeDecision: FinalDecisionRow | null;
+}): Promise<void> {
+  const openedAt = new Date(params.position.opened_at).getTime();
+  const holdingSeconds = Number.isFinite(openedAt)
+    ? Math.max(0, Math.round((Date.now() - openedAt) / 1000))
+    : null;
+
+  const closeSnapshot = params.closeDecision
+    ? buildDecisionSnapshot(params.closeDecision)
+    : null;
+
+  const { error } = await supabase
+    .from("paper_trades")
+    .update({
+      entry_final_score:
+        params.position.entry_final_score == null
+          ? null
+          : Number(params.position.entry_final_score),
+      entry_confidence:
+        params.position.entry_confidence == null
+          ? null
+          : Number(params.position.entry_confidence),
+      entry_direction: params.position.entry_direction,
+      entry_action: params.position.entry_action,
+      entry_trading_permission: params.position.entry_trading_permission,
+      entry_decision_snapshot: params.position.decision_snapshot,
+      close_decision_id: params.closeDecision?.id ?? null,
+      close_final_score: params.closeDecision
+        ? toFiniteNumber(params.closeDecision.final_score, "청산 판단 점수")
+        : null,
+      close_confidence: params.closeDecision
+        ? toFiniteNumber(params.closeDecision.final_confidence, "청산 판단 신뢰도")
+        : null,
+      close_direction: params.closeDecision?.direction ?? null,
+      close_action: params.closeDecision?.action ?? null,
+      close_trading_permission:
+        params.closeDecision?.trading_permission ?? null,
+      close_decision_snapshot: closeSnapshot,
+      holding_seconds: holdingSeconds,
+      mfe_percent:
+        params.position.mfe_percent == null ? 0 : Number(params.position.mfe_percent),
+      mae_percent:
+        params.position.mae_percent == null ? 0 : Number(params.position.mae_percent),
+    })
+    .eq("position_id", params.position.id);
+
+  if (error) {
+    throw new Error(`v3-1 거래 감사정보 저장 실패: ${error.message}`);
+  }
 }
 
 async function insertStrategyRun(params: {
@@ -319,6 +473,68 @@ async function insertEquitySnapshot(params: {
   }
 }
 
+function formatSignedPercent(value: number): string {
+  const rounded = round(value, 3);
+  return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+}
+
+function buildCloseDiagnostic(params: {
+  position: PaperPosition;
+  config: PaperStrategyConfig;
+  decision: PaperDecision | null;
+  marketPrice: number;
+  excursion: PositionExcursion;
+  nowMs?: number;
+}): string {
+  const nowMs = params.nowMs ?? Date.now();
+  const holdingMinutes = elapsedMinutes(params.position.openedAt, nowMs);
+  const holdingProgress = Math.min(
+    999,
+    (holdingMinutes / params.config.maxHoldingMinutes) * 100,
+  );
+
+  const priceReturn =
+    params.position.side === "long"
+      ? ((params.marketPrice / params.position.entryPrice) - 1) * 100
+      : ((params.position.entryPrice / params.marketPrice) - 1) * 100;
+
+  const stopDistance =
+    Math.abs(params.marketPrice - params.position.stopLossPrice) /
+    params.marketPrice *
+    100;
+  const takeProfitDistance =
+    Math.abs(params.position.takeProfitPrice - params.marketPrice) /
+    params.marketPrice *
+    100;
+  const protection = deriveProtectionThresholds(params.position);
+  const trailFloor = params.excursion.mfePercent - protection.trailingGivebackPercent;
+
+  let decisionState = "판단 없음";
+  if (params.decision) {
+    const age = elapsedMinutes(params.decision.decidedAt, nowMs);
+    const freshness = age <= DECISION_MAX_AGE_MINUTES ? "유효" : "만료";
+    decisionState =
+      `${params.decision.direction}/${params.decision.action}` +
+      ` score=${round(params.decision.finalScore, 2)}` +
+      ` conf=${round(params.decision.finalConfidence, 2)}` +
+      ` age=${round(age, 1)}m(${freshness})` +
+      ` permission=${params.decision.tradingPermission}`;
+  }
+
+  return (
+    `보유 ${round(holdingMinutes, 1)}/${params.config.maxHoldingMinutes}분` +
+    `(${round(holdingProgress, 1)}%), ` +
+    `진입대비 ${formatSignedPercent(priceReturn)}, ` +
+    `SL까지 ${round(stopDistance, 3)}%, ` +
+    `TP까지 ${round(takeProfitDistance, 3)}%, ` +
+    `MFE ${formatSignedPercent(params.excursion.mfePercent)}, ` +
+    `MAE ${formatSignedPercent(params.excursion.maePercent)}, ` +
+    `BE≥${round(protection.breakEvenActivationPercent, 3)}%, ` +
+    `Trail≥${round(protection.trailingActivationPercent, 3)}%/floor ${formatSignedPercent(trailFloor)}, ` +
+    `판단 ${decisionState}`
+  );
+}
+
 async function processOpenPosition(params: {
   row: StrategyConfigRow;
   config: PaperStrategyConfig;
@@ -327,13 +543,30 @@ async function processOpenPosition(params: {
   marketPrice: number;
 }): Promise<void> {
   const decision = mapDecision(params.decisionRow);
+  const excursion = await trackPositionExcursion({
+    positionRow: params.positionRow,
+    marketPrice: params.marketPrice,
+  });
+  params.positionRow.mfe_percent = excursion.mfePercent;
+  params.positionRow.mae_percent = excursion.maePercent;
+
   const closeReason = determineCloseReason(
     mapPosition(params.positionRow),
     params.config,
     decision,
     params.marketPrice,
     DECISION_MAX_AGE_MINUTES,
+    Date.now(),
+    excursion,
   );
+
+  const closeDiagnostic = buildCloseDiagnostic({
+    position: mapPosition(params.positionRow),
+    config: params.config,
+    decision,
+    marketPrice: params.marketPrice,
+    excursion,
+  });
 
   if (!closeReason) {
     await insertStrategyRun({
@@ -341,7 +574,7 @@ async function processOpenPosition(params: {
       symbol: params.config.symbol,
       decisionId: params.decisionRow?.id ?? null,
       actionTaken: "held",
-      reason: "익절·손절·최대 보유·유효한 반대 신호 조건이 없어 포지션을 유지했습니다.",
+      reason: `청산 조건 미충족 · ${closeDiagnostic}`,
       marketPrice: params.marketPrice,
     });
     return;
@@ -361,13 +594,20 @@ async function processOpenPosition(params: {
   const closed = result.status === "closed";
   const netPnl = Number(result.net_pnl ?? 0);
 
+  if (closed) {
+    await attachTradeAuditMetadata({
+      position: params.positionRow,
+      closeDecision: params.decisionRow,
+    });
+  }
+
   await insertStrategyRun({
     accountId: params.row.account_id,
     symbol: params.config.symbol,
     decisionId: params.decisionRow?.id ?? null,
     actionTaken: closed ? "closed" : "skipped",
     reason: closed
-      ? `${closeReason} 조건으로 포지션을 청산했습니다. 순손익 ${round(Number.isFinite(netPnl) ? netPnl : 0, 4)} USDT`
+      ? `${closeReason} 조건으로 포지션을 청산했습니다. 순손익 ${round(Number.isFinite(netPnl) ? netPnl : 0, 4)} USDT · ${closeDiagnostic}`
       : result.reason ?? "청산이 건너뛰어졌습니다.",
     marketPrice: params.marketPrice,
   });
@@ -411,6 +651,13 @@ async function processNewEntry(params: {
   const result = (data ?? {}) as RpcResult;
   const opened = result.status === "opened";
   const side = result.side;
+
+  if (opened && result.position_id) {
+    await attachEntryDecisionMetadata({
+      positionId: result.position_id,
+      decision: params.decisionRow,
+    });
+  }
 
   await insertStrategyRun({
     accountId: params.row.account_id,
