@@ -1,4 +1,4 @@
-import { DashboardTopbar } from "@/dashboard/components/DashboardTopbar";
+import { MarketMindShell } from "@/dashboard/components/MarketMindShell";
 import ProjectLayout from "@/components/project-center/ProjectLayout";
 import { getProjectAiDecisionData } from "@/lib/project-center/getProjectAiDecisionData";
 import { getProjectHealthData } from "@/lib/project-center/getProjectHealthData";
@@ -16,9 +16,8 @@ export default async function ProjectCenterPage() {
     [health.checkedAt, aiDecision.checkedAt].sort().at(-1) ?? health.checkedAt;
 
   return (
-    <main className="page-shell">
+    <MarketMindShell active="project-center" updatedAt={updatedAt}>
       <div className="terminal">
-        <DashboardTopbar active="project-center" updatedAt={updatedAt} />
 
         <ProjectLayout
           services={health.services}
@@ -35,6 +34,6 @@ export default async function ProjectCenterPage() {
           <span>Vercel Web · Supabase · External Worker</span>
         </footer>
       </div>
-    </main>
+    </MarketMindShell>
   );
 }

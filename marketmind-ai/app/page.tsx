@@ -2,11 +2,10 @@ import { AiInsightPanel } from "@/dashboard/components/AiInsightPanel";
 import { ComponentCards } from "@/dashboard/components/ComponentCards";
 import { ConsensusPanel } from "@/dashboard/components/ConsensusPanel";
 import { CurrentDecision } from "@/dashboard/components/CurrentDecision";
-import { DashboardTopbar } from "@/dashboard/components/DashboardTopbar";
+import { MarketMindShell } from "@/dashboard/components/MarketMindShell";
 import { LiveBitcoinChart } from "@/dashboard/components/LiveBitcoinChart";
 import { MarketIntelligenceHero } from "@/dashboard/components/MarketIntelligenceHero";
 import { MarketTicker } from "@/dashboard/components/MarketTicker";
-import { PaperTradingSummary } from "@/dashboard/components/PaperTradingSummary";
 import { ReasonPanel } from "@/dashboard/components/ReasonPanel";
 import { RecentDecisions } from "@/dashboard/components/RecentDecisions";
 import { SignalComposition } from "@/dashboard/components/SignalComposition";
@@ -44,49 +43,43 @@ export default async function HomePage() {
   const updatedAt = latestDecision?.decided_at ?? marketData.latest?.calculated_at ?? new Date().toISOString();
 
   return (
-    <main className="page-shell">
+    <MarketMindShell active="dashboard" updatedAt={updatedAt}>
       <div className="terminal terminal-v2">
-        <DashboardTopbar active="dashboard" updatedAt={updatedAt} />
-
-        <section className="page-heading compact-heading">
-          <div>
-            <span className="section-kicker">BTC INTELLIGENCE TERMINAL</span>
-            <h1>시장 대시보드</h1>
-            <p>BTC 가격 흐름과 현재 AI 판단에 집중한 실시간 운영 화면입니다.</p>
-          </div>
-        </section>
 
         {dashboardData.error ? <section className="notice notice-error"><strong>운영 데이터를 불러오지 못했습니다.</strong><span>{dashboardData.error}</span></section> : null}
 
         {latestDecision ? (
           <>
-            <MarketTicker decision={latestDecision} funding={dashboardData.funding} />
+            <MarketTicker decision={latestDecision} funding={dashboardData.funding} positionSide={dashboardData.openPositions[0]?.side ?? null} positionCount={dashboardData.openPositions.length} />
             <section className="market-focus-grid">
-              <LiveBitcoinChart entries={tradeEntries} />
+              <LiveBitcoinChart entries={tradeEntries} positions={dashboardData.openPositions} />
               <CurrentDecision decision={latestDecision} />
             </section>
-            <SignalComposition decision={latestDecision} />
-            <AiInsightPanel decision={latestDecision} />
+            <section className="mm-analysis-row">
+              <SignalComposition decision={latestDecision} />
+              <AiInsightPanel decision={latestDecision} />
+            </section>
           </>
         ) : marketData.latest ? (
           <>
             <section className="notice"><strong>Final Market AI 판단을 기다리고 있습니다.</strong><span>현재는 Market Intelligence 최신 결과를 대신 표시합니다.</span></section>
-            <LiveBitcoinChart entries={tradeEntries} />
+            <LiveBitcoinChart entries={tradeEntries} positions={dashboardData.openPositions} />
             <MarketIntelligenceHero data={marketData.latest} />
             <ComponentCards breakdown={marketData.latest.breakdown} />
             <section className="analysis-grid"><ConsensusPanel votes={marketData.latest.direction_votes} /><ReasonPanel reasons={marketData.latest.reasons} /></section>
           </>
         ) : (
-          <><LiveBitcoinChart entries={tradeEntries} /><section className="panel empty-state"><div className="empty-mark">MM</div><h1>아직 생성된 AI 시장 판단이 없습니다.</h1><p>차트는 계속 표시되며, Market Worker 실행 후 AI 판단이 이 화면에 연결됩니다.</p></section></>
+          <><LiveBitcoinChart entries={tradeEntries} positions={dashboardData.openPositions} /><section className="panel empty-state"><div className="empty-mark"><img src="/marketmind-logo.svg" alt="" style={{width:"52px",height:"52px"}} /></div><h1>아직 생성된 AI 시장 판단이 없습니다.</h1><p>차트는 계속 표시되며, Market Worker 실행 후 AI 판단이 이 화면에 연결됩니다.</p></section></>
         )}
 
-        <section className="home-bottom-grid">
-          <PaperTradingSummary data={dashboardData} />
-          {dashboardData.decisions.length > 0 ? <RecentDecisions decisions={dashboardData.decisions.slice(0, 5)} /> : null}
-        </section>
+        {dashboardData.decisions.length > 0 ? (
+          <section className="home-bottom-grid dashboard-recent-only">
+            <RecentDecisions decisions={dashboardData.decisions.slice(0, 5)} />
+          </section>
+        ) : null}
 
         <footer className="terminal-footer"><span>MarketMind AI · BTC Intelligence</span><span>Paper Trading Only · No Live Trading</span></footer>
       </div>
-    </main>
+    </MarketMindShell>
   );
 }

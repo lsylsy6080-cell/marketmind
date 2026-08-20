@@ -9,10 +9,13 @@ type DashboardTopbarProps = {
 export function DashboardTopbar({ updatedAt, active = "dashboard" }: DashboardTopbarProps) {
   return (
     <header className="topbar">
-      <div className="brand-block">
-        <div className="brand-mark">M</div>
-        <div><strong>MarketMind AI</strong><span>BTC Intelligence Terminal</span></div>
-      </div>
+      <Link href="/" className="brand-block" aria-label="MarketMind AI 홈">
+        <img className="brand-logo" src="/marketmind-logo.svg" alt="" />
+        <div className="brand-copy">
+          <strong>MarketMind <em>AI</em></strong>
+          <span>BTC Intelligence Terminal</span>
+        </div>
+      </Link>
 
       <nav className="main-nav" aria-label="주요 메뉴">
         <Link className={active === "dashboard" ? "active" : ""} href="/">시장 대시보드</Link>
@@ -22,7 +25,7 @@ export function DashboardTopbar({ updatedAt, active = "dashboard" }: DashboardTo
 
       <div className="topbar-status">
         <span className="live-dot" />
-        <div><strong>시스템 정상</strong><span>{formatRelativeTime(updatedAt)} · {formatDateTime(updatedAt)}</span></div>
+        <div><strong>ONLINE</strong><span>{formatRelativeTime(updatedAt)} · {formatDateTime(updatedAt)}</span></div>
       </div>
     </header>
   );

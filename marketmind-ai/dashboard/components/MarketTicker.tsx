@@ -1,29 +1,19 @@
-import Image from "next/image";
 import {
-  formatDateTime,
   formatPercent,
-  formatPrice,
   normalizeLabel,
 } from "../format";
 import type { FinalMarketDecision, FundingSnapshot } from "../types";
 
-const COIN_ICONS: Record<string, string> = {
-  BTCUSDT: "/assets/coins/btc.png",
-  BTCUSD: "/assets/coins/btc.png",
-  BTC: "/assets/coins/btc.png",
-};
-
-
-function getCoinIcon(symbol: string): string {
-  return COIN_ICONS[symbol.toUpperCase()] ?? "/assets/coins/btc.png";
-}
-
 export function MarketTicker({
   decision,
   funding,
+  positionSide,
+  positionCount = 0,
 }: {
   decision: FinalMarketDecision;
   funding: FundingSnapshot | null;
+  positionSide?: string | null;
+  positionCount?: number;
 }) {
   const fundingPercent =
     funding?.funding_rate_percent ??
@@ -31,54 +21,30 @@ export function MarketTicker({
       ? funding.funding_rate * 100
       : null);
 
+  const confidence = decision.final_confidence ?? null;
+  const signal = normalizeLabel(decision.direction);
+  const position = positionSide ? positionSide.toUpperCase() : "대기";
+
   return (
-    <section className="market-ticker panel">
-      <div className="ticker-asset">
-        <div className="coin-logo-wrap">
-          <Image
-            src={getCoinIcon(decision.symbol)}
-            alt={`${decision.symbol} symbol`}
-            width={64}
-            height={64}
-            priority
-            className="coin-logo"
-          />
-        </div>
-
-        <div className="asset-meta">
-          <strong>{decision.symbol}</strong>
-          <small>Perpetual</small>
-          <span className="live-label">
-            <i /> 실시간
-          </span>
-        </div>
-
-
-      </div>
-
-      <div className="ticker-item">
-        <span>Mark Price</span>
-        <strong>${formatPrice(funding?.mark_price ?? null)}</strong>
-        <small className="positive-text">
-          {normalizeLabel(decision.direction)}
-        </small>
-      </div>
-
-      <div className="ticker-item">
+    <section className="mm-kpi-grid mm-kpi-grid-3" aria-label="시장 핵심 지표">
+      <article className="mm-kpi-card">
         <span>Funding Rate</span>
-        <strong className="positive-text">
-          {formatPercent(fundingPercent, 4)}
-        </strong>
-        <small>{normalizeLabel(funding?.risk_level ?? null)}</small>
-      </div>
+        <strong>{formatPercent(fundingPercent, 4)}</strong>
+        <small>{normalizeLabel(funding?.risk_level ?? "NORMAL")}</small>
+      </article>
 
-      <div className="ticker-item">
-        <span>업데이트</span>
-        <strong className="ticker-time">
-          {formatDateTime(funding?.fetched_at ?? decision.decided_at)}
-        </strong>
-        <small>Asia/Seoul</small>
-      </div>
+      <article className="mm-kpi-card mm-kpi-signal">
+        <span>AI 신호</span>
+        <strong>{signal}</strong>
+        <div className="mm-kpi-progress"><i style={{ width: `${Math.min(100, Math.max(0, Number(confidence ?? 0)))}%` }} /></div>
+        <small>신뢰도 {confidence !== null ? `${Number(confidence).toFixed(0)}%` : "—"}</small>
+      </article>
+
+      <article className="mm-kpi-card">
+        <span>포지션 상태</span>
+        <strong className={positionSide ? (positionSide.toLowerCase() === "long" ? "paper-positive" : "paper-negative") : ""}>{position}</strong>
+        <small>실제 유지 포지션 {positionCount}</small>
+      </article>
     </section>
   );
 }

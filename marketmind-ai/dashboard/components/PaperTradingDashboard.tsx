@@ -1,18 +1,13 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { FinalMarketDecision, PaperPosition, PaperTradingData } from "../types";
 import { formatDateTime, formatNumber, formatPercent, formatPrice, formatRelativeTime } from "../format";
+import { useLiveBtcPrice } from "../hooks/useLiveBtcPrice";
+import { calculateLivePositionMetrics } from "../live-position";
 
 function signed(value: number, digits = 2) {
   return `${value > 0 ? "+" : ""}${formatNumber(value, digits)}`;
-}
-
-function pnlForPosition(position: PaperPosition, marketPrice: number | null) {
-  if (!marketPrice) return { pnl: 0, roi: 0 };
-  const gross = position.side === "long"
-    ? (marketPrice - position.entry_price) * position.quantity
-    : (position.entry_price - marketPrice) * position.quantity;
-  const pnl = gross - position.entry_fee;
-  const notional = position.entry_price * position.quantity;
-  return { pnl, roi: notional > 0 ? (pnl / notional) * 100 : 0 };
 }
 
 function secondsLabel(value: number | null | undefined) {
@@ -134,11 +129,24 @@ function EquityChart({ data, initialBalance }: { data: PaperTradingData["equity"
 }
 
 export function PaperTradingDashboard({ data }: { data: PaperTradingData }) {
+  const { price: liveMarketPrice, status: livePriceStatus } = useLiveBtcPrice(data.marketPrice);
+  const [clockTick, setClockTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((value) => value + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   if (data.error) return <section className="panel paper-notice"><strong>Paper Trading 데이터를 불러오지 못했습니다.</strong><span>{data.error}</span></section>;
   if (!data.account) return <section className="panel paper-notice"><strong>Paper Trading 계정이 없습니다.</strong><span>010-paper-trading-v1.sql 실행 여부를 확인해주세요.</span></section>;
 
-  const { account, config, openPositions, trades, runs, marketPrice, strategyPerformance } = data;
-  const unrealized = openPositions.reduce((sum, position) => sum + pnlForPosition(position, marketPrice).pnl, 0);
+  const { account, config, openPositions, trades, runs, marketPrice: snapshotMarketPrice, strategyPerformance } = data;
+  const marketPrice = liveMarketPrice ?? snapshotMarketPrice;
+
+  void clockTick;
+  const unrealized = marketPrice
+    ? openPositions.reduce((sum, position) => sum + calculateLivePositionMetrics(position, marketPrice).unrealizedPnl, 0)
+    : 0;
   const equity = account.cash_balance + openPositions.reduce((sum, position) => sum + position.entry_price * position.quantity, 0) + unrealized;
   const totalPnl = account.realized_pnl + unrealized;
   const wins = trades.filter((trade) => trade.net_pnl > 0).length;
@@ -151,7 +159,7 @@ export function PaperTradingDashboard({ data }: { data: PaperTradingData }) {
   const profitFactor = grossLoss > 0 ? grossWins / grossLoss : grossWins > 0 ? grossWins : 0;
   const primary = openPositions[0] ?? null;
   const primaryDecision = primary?.opening_decision_id ? data.decisionsById[primary.opening_decision_id] : undefined;
-  const primaryPnl = primary ? pnlForPosition(primary, marketPrice) : null;
+  const primaryPnl = primary && marketPrice ? calculateLivePositionMetrics(primary, marketPrice) : null;
   const rejectionCounts = runs.filter((run) => run.action_taken === "skipped").reduce<Record<string, number>>((acc, run) => { acc[run.reason] = (acc[run.reason] ?? 0) + 1; return acc; }, {});
   const latestRun = runs[0];
   const latestDecision = latestRun?.decision_id
@@ -187,10 +195,10 @@ export function PaperTradingDashboard({ data }: { data: PaperTradingData }) {
     <div className="paper-main-grid">
       <article className="panel paper-runs"><h2>워커 실행 결과 <small>최근 10건</small></h2><div className="paper-run-stats"><span><b>{runs.length}</b>실행</span><span><b>{openedRuns}</b>진입</span><span><b>{runStats.closed ?? 0}</b>청산</span><span><b>{runStats.skipped ?? 0}</b>대기</span></div><div className="paper-table-wrap"><table><thead><tr><th>시간</th><th>결과</th><th>종목</th><th>결정 ID</th><th>가격</th><th>사유 / 요약</th></tr></thead><tbody>{runs.slice(0,10).map((run)=><tr key={run.id}><td>{formatDateTime(run.created_at)}</td><td><b className={`paper-status ${run.action_taken}`}>{koRunStatus(run.action_taken)}</b></td><td>{run.symbol}</td><td>{run.decision_id ?? "—"}</td><td>{formatPrice(run.market_price)}</td><td className="paper-left">{run.reason}</td></tr>)}</tbody></table></div></article>
 
-      <article className="panel paper-position-card"><div className="paper-section-head"><h2>현재 유지 중인 포지션 <span>{openPositions.length}</span></h2>{primary ? <b className={`paper-side ${primary.side}`}>{primary.side === "long" ? "롱" : "숏"}</b> : null}</div>
+      <article className="panel paper-position-card"><div className="paper-section-head"><h2>현재 유지 중인 포지션 <span>{openPositions.length}</span></h2><div className="paper-position-head-actions"><span className={`paper-live-price-state ${livePriceStatus}`}>{livePriceStatus === "live" ? "● LIVE PNL" : livePriceStatus === "reconnecting" ? "● 재연결 중" : "● 연결 중"}</span>{primary ? <b className={`paper-side ${primary.side}`}>{primary.side === "long" ? "롱" : "숏"}</b> : null}</div></div>
         {!primary ? <div className="paper-waiting"><div className="paper-waiting-head"><div><span className="paper-pulse"/>진입 대기 중</div><strong>{latestDecision ? formatNumber(latestDecision.final_score, 2) : "—"}</strong><small>현재 최종 점수</small></div><div className="paper-condition-grid">{latestConditions.map((item) => <div key={item.label} className={item.ok ? "ok" : "fail"}><span>{item.label}</span><b>{typeof item.value === "number" ? formatNumber(item.value, 2) : String(item.value ?? "—")}</b><small>기준 {item.target}</small><i>{item.ok ? "통과" : "대기"}</i></div>)}</div><div className="paper-wait-progress"><div><span>SHORT {config?.short_score_max ?? 30}</span><b style={{left:`${Math.min(100, Math.max(0, Number(latestDecision?.final_score ?? 50)))}%`}}/><span>LONG {config?.long_score_min ?? 70}</span></div><p>{waitingSummary(latestDecision, config)}</p></div><div className="paper-entry-analysis paper-wait-analysis"><div><h3>AI 진입 분석</h3><dl><dt>최종 점수</dt><dd>{formatNumber(latestDecision?.final_score ?? null,2)}</dd><dt>신뢰도</dt><dd>{formatPercent(latestDecision?.final_confidence ?? null)}</dd><dt>기술 분석</dt><dd>{formatNumber(latestDecision?.technical_score ?? null,2)}</dd><dt>뉴스 분석</dt><dd>{formatNumber(latestDecision?.news_score ?? null,2)}</dd><dt>펀딩 분석</dt><dd>{formatNumber(latestDecision?.funding_score ?? null,2)}</dd><dt>시장 국면</dt><dd>{koRegime(latestDecision?.market_regime)}</dd></dl></div><div><h3>현재 판단 근거</h3><ul>{reasonItems(latestDecision).map((reason)=><li key={reason}>{reason}</li>)}</ul></div><blockquote><b>AI 판단 요약</b>{latestDecision?.decision_summary ?? waitingSummary(latestDecision, config)}</blockquote></div></div> : <>
-          <div className="paper-position-title"><strong>{primary.symbol}</strong><small>진입 시각 {formatDateTime(primary.opened_at)}</small></div>
-          <div className="paper-position-values"><div><span>진입 가격</span><strong>{formatPrice(primary.entry_price)}</strong></div><div><span>현재 가격</span><strong>{formatPrice(marketPrice)}</strong></div><div><span>수량</span><strong>{formatNumber(primary.quantity, 8)}</strong></div><div><span>미실현 PnL</span><strong className={primaryPnl && primaryPnl.pnl >= 0 ? "paper-positive" : "paper-negative"}>{primaryPnl ? `${signed(primaryPnl.pnl)} USDT` : "—"}</strong></div><div><span>ROI</span><strong className={primaryPnl && primaryPnl.roi >= 0 ? "paper-positive" : "paper-negative"}>{primaryPnl ? formatPercent(primaryPnl.roi) : "—"}</strong></div><div><span>보유 시간</span><strong>{durationLabel(primary.opened_at)}</strong></div></div>
+          <div className="paper-position-title"><div className="paper-position-identity"><strong>{primary.symbol}</strong><span className={`paper-side ${primary.side}`}>{primary.side === "long" ? "LONG" : "SHORT"}</span></div><small>진입 {formatDateTime(primary.opened_at)} · 보유 {durationLabel(primary.opened_at)}</small></div>
+          <div className="paper-position-values paper-position-values-live"><div><span>진입 가격</span><strong>{formatPrice(primary.entry_price)}</strong></div><div><span>현재가</span><strong>{formatPrice(marketPrice)}</strong></div><div><span>가격 수익률</span><strong className={primaryPnl && primaryPnl.priceReturnPercent >= 0 ? "paper-positive" : "paper-negative"}>{primaryPnl ? formatPercent(primaryPnl.priceReturnPercent, 2) : "—"}</strong></div><div><span>수량</span><strong>{formatNumber(primary.quantity, 8)}</strong></div><div><span>미실현 PnL</span><strong className={`paper-pnl-nowrap ${primaryPnl && primaryPnl.unrealizedPnl >= 0 ? "paper-positive" : "paper-negative"}`}>{primaryPnl ? `${signed(primaryPnl.unrealizedPnl)} USDT` : "—"}</strong></div><div><span>ROI</span><strong className={primaryPnl && primaryPnl.roiPercent >= 0 ? "paper-positive" : "paper-negative"}>{primaryPnl ? formatPercent(primaryPnl.roiPercent, 2) : "—"}</strong></div></div>
           <div className="paper-risk-values"><span>SL <b>{formatPrice(primary.stop_loss_price)}</b></span><span>현재가 <b>{formatPrice(marketPrice)}</b></span><span>TP <b>{formatPrice(primary.take_profit_price)}</b></span></div>
           <div className="paper-risk-bar"><i style={{left: `${Math.min(100, Math.max(0, ((Number(marketPrice ?? primary.entry_price) - primary.stop_loss_price)/(primary.take_profit_price-primary.stop_loss_price))*100))}%`}}/></div>
           <div className="paper-entry-analysis"><div><h3>AI 진입 분석</h3><dl><dt>최종 점수</dt><dd>{formatNumber(primaryDecision?.final_score ?? null,2)}</dd><dt>신뢰도</dt><dd>{formatPercent(primaryDecision?.final_confidence ?? null)}</dd><dt>기술 분석</dt><dd>{formatNumber(primaryDecision?.technical_score ?? null,2)}</dd><dt>뉴스 분석</dt><dd>{formatNumber(primaryDecision?.news_score ?? null,2)}</dd><dt>펀딩 분석</dt><dd>{formatNumber(primaryDecision?.funding_score ?? null,2)}</dd><dt>시장 국면</dt><dd>{koRegime(primaryDecision?.market_regime)}</dd></dl></div><div><h3>진입 이유</h3><ul>{reasonItems(primaryDecision).map((reason)=><li key={reason}>{reason}</li>)}</ul></div><blockquote><b>AI 판단 요약</b>{primaryDecision?.decision_summary ?? "포지션 진입 당시 AI 판단 요약이 없습니다."}</blockquote></div>
@@ -200,7 +208,7 @@ export function PaperTradingDashboard({ data }: { data: PaperTradingData }) {
       <aside className="paper-side-stack"><article className="panel paper-rejections"><h2>진입 거절 사유 <small>최근 기록</small></h2>{Object.entries(rejectionCounts).slice(0,5).map(([reason,count])=><div key={reason}><span>{reason}</span><b>{count}</b></div>)}</article><article className="panel paper-strategy"><h2>전략 기준 <small>{config?.strategy_version ?? "—"}</small></h2><dl><dt>롱 진입</dt><dd>최종 점수 ≥ {config?.long_score_min ?? "—"}</dd><dt>숏 진입</dt><dd>최종 점수 ≤ {config?.short_score_max ?? "—"}</dd><dt>신뢰도</dt><dd>≥ {config?.confidence_min ?? "—"}</dd><dt>포지션 크기</dt><dd>{config?.position_size_percent ?? "—"}%</dd><dt>SL / TP</dt><dd>{config?.stop_loss_percent ?? "—"}% / {config?.take_profit_percent ?? "—"}%</dd><dt>최대 보유 시간</dt><dd>{config ? `${Math.round(config.max_holding_minutes/60)}h` : "—"}</dd></dl></article><article className="panel paper-worker-monitor"><h2>워커 모니터 <small>최근 파이프라인 상태</small></h2><div>{["수집기","기술 분석","뉴스 분석","펀딩 분석","최종 AI","모의매매 워커","백테스트","성과 분석"].map((name,index)=><span key={name}><i className={index===6 && !runs.length ? "waiting" : "running"}/><b>{name}</b><small>{index===5 ? formatRelativeTime(latestRun?.created_at ?? null) : "정상"}</small></span>)}</div></article></aside>
     </div>
 
-    <article className="panel paper-holdings"><h2>유지 중인 포지션 <small>실제 보유 포지션</small></h2><div className="paper-table-wrap"><table><thead><tr><th>종목</th><th>방향</th><th>진입 가격</th><th>현재 가격</th><th>수량</th><th>미실현 PnL</th><th>ROI</th><th>진입 시간</th><th>보유 시간</th><th>TP</th><th>SL</th><th>상태</th></tr></thead><tbody>{openPositions.length ? openPositions.map((position)=>{const p=pnlForPosition(position,marketPrice);return <tr key={position.id}><td>{position.symbol}</td><td><b className={`paper-side ${position.side}`}>{position.side === "long" ? "롱" : "숏"}</b></td><td>{formatPrice(position.entry_price)}</td><td>{formatPrice(marketPrice)}</td><td>{formatNumber(position.quantity,8)}</td><td className={p.pnl>=0?"paper-positive":"paper-negative"}>{signed(p.pnl)}</td><td className={p.roi>=0?"paper-positive":"paper-negative"}>{formatPercent(p.roi)}</td><td>{formatDateTime(position.opened_at)}</td><td>{durationLabel(position.opened_at)}</td><td>{formatPrice(position.take_profit_price)}</td><td>{formatPrice(position.stop_loss_price)}</td><td><b className="paper-status held">보유 중</b></td></tr>}) : <tr><td colSpan={12}>현재 유지 중인 포지션이 없습니다.</td></tr>}</tbody></table></div></article>
+    <article className="panel paper-holdings"><h2>유지 중인 포지션 <small>실제 보유 포지션</small></h2><div className="paper-table-wrap"><table><thead><tr><th>종목</th><th>방향</th><th>진입 가격</th><th>현재 가격</th><th>수량</th><th>미실현 PnL</th><th>ROI</th><th>진입 시간</th><th>보유 시간</th><th>TP</th><th>SL</th><th>상태</th></tr></thead><tbody>{openPositions.length ? openPositions.map((position)=>{const p=marketPrice?calculateLivePositionMetrics(position,marketPrice):null;return <tr key={position.id}><td>{position.symbol}</td><td><b className={`paper-side ${position.side}`}>{position.side === "long" ? "롱" : "숏"}</b></td><td>{formatPrice(position.entry_price)}</td><td>{formatPrice(marketPrice)}</td><td>{formatNumber(position.quantity,8)}</td><td className={(p?.unrealizedPnl ?? 0)>=0?"paper-positive":"paper-negative"}>{p ? signed(p.unrealizedPnl) : "—"}</td><td className={(p?.roiPercent ?? 0)>=0?"paper-positive":"paper-negative"}>{p ? formatPercent(p.roiPercent, 2) : "—"}</td><td>{formatDateTime(position.opened_at)}</td><td>{durationLabel(position.opened_at)}</td><td>{formatPrice(position.take_profit_price)}</td><td>{formatPrice(position.stop_loss_price)}</td><td><b className="paper-status held">보유 중</b></td></tr>}) : <tr><td colSpan={12}>현재 유지 중인 포지션이 없습니다.</td></tr>}</tbody></table></div></article>
 
     <div className="paper-bottom-grid"><article className="panel paper-trades"><h2>최근 거래 내역</h2><div className="paper-table-wrap"><table><thead><tr><th>청산 시간</th><th>종목</th><th>방향</th><th>진입가</th><th>청산가</th><th>수량</th><th>수수료</th><th>PnL</th><th>수익률</th><th>유형</th></tr></thead><tbody>{trades.slice(0,8).map((trade)=><tr key={trade.id}><td>{formatDateTime(trade.closed_at)}</td><td>{trade.symbol}</td><td><b className={`paper-side ${trade.side}`}>{trade.side === "long" ? "롱" : "숏"}</b></td><td>{formatPrice(trade.entry_price)}</td><td>{formatPrice(trade.exit_price)}</td><td>{formatNumber(trade.quantity,8)}</td><td>{formatNumber(trade.fees,4)}</td><td className={trade.net_pnl>=0?"paper-positive":"paper-negative"}>{signed(trade.net_pnl)}</td><td className={trade.return_percent>=0?"paper-positive":"paper-negative"}>{formatPercent(trade.return_percent)}</td><td>{trade.close_reason}</td></tr>)}</tbody></table></div></article><article className="panel paper-performance"><h2>성과 요약</h2><EquityChart data={data.equity} initialBalance={account.initial_balance}/><div className="paper-performance-values"><span>누적 수익률 <b className={totalPnl>=0?"paper-positive":"paper-negative"}>{formatPercent(totalPnl/account.initial_balance*100)}</b></span><span>총 실현 손익 <b className={account.realized_pnl>=0?"paper-positive":"paper-negative"}>{signed(account.realized_pnl)} USDT</b></span><span>평균 수익률 <b>{formatPercent(avgReturn)}</b></span><span>수익 팩터 <b>{formatNumber(profitFactor,2)}</b></span></div></article></div>
 

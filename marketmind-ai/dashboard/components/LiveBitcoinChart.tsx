@@ -10,11 +10,15 @@ import {
   createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
+  type IPriceLine,
   type ISeriesMarkersPluginApi,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
+  LineStyle,
 } from "lightweight-charts";
+import type { PaperPosition } from "../types";
+import { calculateLivePositionMetrics } from "../live-position";
 
 type Interval = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
@@ -65,7 +69,16 @@ function nearestCandleTime(candles: Candle[], timestamp: number) {
   return best.time as UTCTimestamp;
 }
 
-export function LiveBitcoinChart({ entries = [] }: { entries?: TradeEntryMarker[] }) {
+type LiveBitcoinChartProps = {
+  entries?: TradeEntryMarker[];
+  positions?: PaperPosition[];
+};
+
+function signed(value: number, digits = 2) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
+}
+
+export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -73,6 +86,7 @@ export function LiveBitcoinChart({ entries = [] }: { entries?: TradeEntryMarker[
   const ema60SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema120SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const entryPriceLineRef = useRef<IPriceLine | null>(null);
   const candlesRef = useRef<Candle[]>([]);
   const loadingOlderRef = useRef(false);
   const hasMoreHistoryRef = useRef(true);
@@ -153,6 +167,7 @@ export function LiveBitcoinChart({ entries = [] }: { entries?: TradeEntryMarker[
     return () => {
       resizeObserver.disconnect();
       markerPluginRef.current = null;
+      entryPriceLineRef.current = null;
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -323,6 +338,37 @@ export function LiveBitcoinChart({ entries = [] }: { entries?: TradeEntryMarker[
     };
   }, [interval]);
 
+  const primaryPosition = positions[0] ?? null;
+
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+
+    if (entryPriceLineRef.current) {
+      series.removePriceLine(entryPriceLineRef.current);
+      entryPriceLineRef.current = null;
+    }
+
+    if (!primaryPosition) return;
+
+    const isLong = primaryPosition.side === "long";
+    entryPriceLineRef.current = series.createPriceLine({
+      price: primaryPosition.entry_price,
+      color: isLong ? "#22c55e" : "#ef5350",
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: `${isLong ? "LONG" : "SHORT"} ENTRY`,
+    });
+
+    return () => {
+      if (entryPriceLineRef.current && candleSeriesRef.current) {
+        candleSeriesRef.current.removePriceLine(entryPriceLineRef.current);
+        entryPriceLineRef.current = null;
+      }
+    };
+  }, [primaryPosition]);
+
   const markers = useMemo(() => {
     if (!candles.length) return [] as SeriesMarker<Time>[];
     const first = candles[0].time;
@@ -353,6 +399,10 @@ export function LiveBitcoinChart({ entries = [] }: { entries?: TradeEntryMarker[
   const latest = candles[candles.length - 1] ?? null;
   const firstVisible = candles[Math.max(0, candles.length - 96)] ?? null;
   const change = latest && firstVisible ? ((latest.close - firstVisible.open) / firstVisible.open) * 100 : null;
+  const liveMetrics = latest && primaryPosition ? calculateLivePositionMetrics(primaryPosition, latest.close) : null;
+  const aggregatePnl = latest
+    ? positions.reduce((sum, position) => sum + calculateLivePositionMetrics(position, latest.close).unrealizedPnl, 0)
+    : null;
 
   return (
     <section className="panel live-chart-panel tradingview-chart-panel">
@@ -381,6 +431,44 @@ export function LiveBitcoinChart({ entries = [] }: { entries?: TradeEntryMarker[
         <span className="ema120-label">EMA 120</span>
         <small>{loadingOlder ? "과거 캔들 불러오는 중…" : "왼쪽으로 드래그하면 과거 캔들 자동 로딩 · 실제 모의매매 진입만 표시"}</small>
       </div>
+
+      {primaryPosition && latest && liveMetrics ? (
+        <div className={`live-position-strip ${primaryPosition.side}`}>
+          <div className="live-position-main">
+            <span className="live-position-dot" aria-hidden="true" />
+            <div>
+              <small>OPEN POSITION</small>
+              <strong>{primaryPosition.side === "long" ? "LONG" : "SHORT"}</strong>
+            </div>
+          </div>
+          <div>
+            <small>진입가</small>
+            <strong>${primaryPosition.entry_price.toLocaleString("en-US", { maximumFractionDigits: 2 })}</strong>
+          </div>
+          <div>
+            <small>현재가</small>
+            <strong>${latest.close.toLocaleString("en-US", { maximumFractionDigits: 2 })}</strong>
+          </div>
+          <div>
+            <small>가격 수익률</small>
+            <strong className={liveMetrics.priceReturnPercent >= 0 ? "paper-positive" : "paper-negative"}>
+              {signed(liveMetrics.priceReturnPercent)}%
+            </strong>
+          </div>
+          <div>
+            <small>포지션 ROI</small>
+            <strong className={liveMetrics.roiPercent >= 0 ? "paper-positive" : "paper-negative"}>
+              {signed(liveMetrics.roiPercent)}%
+            </strong>
+          </div>
+          <div>
+            <small>미실현 PnL</small>
+            <strong className={(aggregatePnl ?? 0) >= 0 ? "paper-positive" : "paper-negative"}>
+              {signed(aggregatePnl ?? liveMetrics.unrealizedPnl, 2)} USDT
+            </strong>
+          </div>
+        </div>
+      ) : null}
 
       <div ref={containerRef} className="tradingview-chart-container" aria-label={`BTCUSDT ${interval} TradingView 실시간 캔들 차트`} />
       <div className="chart-footnote">

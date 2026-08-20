@@ -1,0 +1,17 @@
+{
+  "name": "MarketMind AI",
+  "short_name": "MarketMind AI",
+  "description": "BTC Intelligence Terminal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F19",
+  "theme_color": "#7C3AED",
+  "icons": [
+    {
+      "src": "/marketmind-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
