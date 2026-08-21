@@ -988,3 +988,24 @@ body{
 .mm-v2-blockers,.mm-v2-ready{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;padding:11px 12px;border-radius:7px;background:#0c1624;color:#aeb9c9;font-size:12px}.mm-v2-blockers strong{color:#f0b967}.mm-v2-ready{color:#69ddb0}.mm-v2-empty{color:#9eabc0;font-size:14px}
 @media(max-width:1000px){.mm-v2-summary,.mm-entry-prices{grid-template-columns:repeat(2,minmax(0,1fr))}.mm-trigger-conditions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.mm-v2-summary,.mm-entry-prices,.mm-trigger-conditions{grid-template-columns:1fr}}
+
+/* Phase 7-6.2 — realtime chart / worker refresh */
+.mm-refresh-control{display:flex;align-items:center;gap:9px;padding:5px 6px 5px 10px;border:1px solid rgba(103,122,154,.25);border-radius:9px;background:rgba(8,18,33,.72)}
+.mm-worker-updated{display:grid;grid-template-columns:auto auto;column-gap:7px;align-items:center;min-width:158px}
+.mm-worker-updated>span{grid-column:1;font-size:10px;color:#7788a1}
+.mm-worker-updated>strong{grid-column:2;grid-row:1;font-size:11px;color:#7ee2b8;text-align:right}
+.mm-worker-updated>small{grid-column:1/3;margin-top:2px;font-size:9.5px;color:#60728d;white-space:nowrap}
+.mm-refresh-control button{height:31px;padding:0 10px;border:1px solid #293a55;border-radius:7px;background:#0c1727;color:#aebbd0;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;cursor:pointer;transition:.18s ease}
+.mm-refresh-control button:hover{border-color:#52698d;color:#eef4ff;background:#111f34}
+.mm-refresh-control button:disabled{opacity:.65;cursor:default}
+.mm-refresh-control button i{font-style:normal;font-size:15px;line-height:1}
+.mm-refresh-control button.refreshing i{animation:mm-refresh-spin .8s linear infinite}
+@keyframes mm-refresh-spin{to{transform:rotate(360deg)}}
+@media(max-width:1180px){.mm-worker-updated{display:none}.mm-refresh-control{padding:4px}.mm-refresh-control button span{display:none}.mm-refresh-control button{width:32px;padding:0;justify-content:center}}
+
+/* Phase 7-6.3 — Entry Plan targets only */
+.mm-entry-prices.mm-entry-prices-targets{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mm-entry-prices-targets .invalid span{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mm-entry-prices-targets .invalid span b{font-size:10px;font-weight:800;color:#ff8996}
+@media(max-width:1000px){.mm-entry-prices.mm-entry-prices-targets{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.mm-entry-prices.mm-entry-prices-targets{grid-template-columns:1fr}}

@@ -24,6 +24,13 @@ type Interval = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
 type KlinePayload = { e?: string; k?: { t: number; o: string; h: string; l: string; c: string; v: string } };
 type TradeEntryMarker = { opened_at: string; side: "long" | "short"; entry_price: number };
+type TradeExitMarker = {
+  closed_at: string;
+  side: "long" | "short";
+  exit_price: number;
+  return_percent: number;
+  close_reason: string;
+};
 
 const intervals: { value: Interval; label: string }[] = [
   { value: "1m", label: "1분" },
@@ -71,6 +78,7 @@ function nearestCandleTime(candles: Candle[], timestamp: number) {
 
 type LiveBitcoinChartProps = {
   entries?: TradeEntryMarker[];
+  exits?: TradeExitMarker[];
   positions?: PaperPosition[];
 };
 
@@ -78,7 +86,7 @@ function signed(value: number, digits = 2) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
 }
 
-export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinChartProps) {
+export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: LiveBitcoinChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -180,6 +188,8 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
   useEffect(() => {
     let disposed = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let socket: WebSocket | null = null;
     const chart = chartRef.current;
 
     function applyAllSeries(history: Candle[]) {
@@ -242,27 +252,57 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
       if (range.from < 50) void fetchOlderHistory();
     };
 
+    async function loadInitialHistory() {
+      const MAX_INITIAL_CANDLES = 5000;
+      const PAGE_SIZE = 1000;
+      let endTime: number | null = null;
+      let all: Candle[] = [];
+      let hasMore = true;
+
+      while (!disposed && hasMore && all.length < MAX_INITIAL_CANDLES) {
+        const params = new URLSearchParams({
+          symbol: "BTCUSDT",
+          interval,
+          limit: String(PAGE_SIZE),
+        });
+        if (endTime != null) params.set("endTime", String(endTime));
+
+        const response = await fetch(`/api/market-chart?${params.toString()}&_=${Date.now()}`, { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error ?? "차트 데이터 오류");
+
+        const batch = (payload.candles as Candle[] | undefined) ?? [];
+        if (!batch.length) break;
+
+        const merged = new Map<number, Candle>();
+        for (const candle of [...batch, ...all]) merged.set(candle.time, candle);
+        all = Array.from(merged.values()).sort((a, b) => a.time - b.time);
+
+        hasMore = Boolean(payload.hasMore);
+        endTime = batch[0].time * 1000 - 1;
+        if (batch.length < PAGE_SIZE) hasMore = false;
+      }
+
+      return { candles: all, hasMore };
+    }
+
     async function loadHistory() {
       setStatus("loading");
       setError(null);
       loadingOlderRef.current = false;
       hasMoreHistoryRef.current = true;
       try {
-        const response = await fetch(`/api/market-chart?symbol=BTCUSDT&interval=${interval}&limit=500`, { cache: "no-store" });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error ?? "차트 데이터 오류");
+        const initial = await loadInitialHistory();
         if (disposed) return;
-        const history = payload.candles as Candle[];
+        const history = initial.candles;
+        if (!history.length) throw new Error("표시할 과거 차트 데이터가 없습니다.");
         candlesRef.current = history;
         setCandles(history);
-        hasMoreHistoryRef.current = Boolean(payload.hasMore);
+        hasMoreHistoryRef.current = initial.hasMore;
         applyAllSeries(history);
-        if (history.length) {
-          chartRef.current?.timeScale().setVisibleLogicalRange({
-            from: Math.max(0, history.length - 120),
-            to: history.length + 5,
-          });
-        }
+        // Phase 7-6.4: 최대 5,000개 과거 캔들을 최초에 로드하고 전체 구간을 한 화면에 맞춥니다.
+        // 이후 확대하거나 왼쪽으로 이동하면 기존 무한 과거 로딩도 계속 사용할 수 있습니다.
+        chartRef.current?.timeScale().fitContent();
       } catch (e) {
         if (!disposed) {
           setStatus("error");
@@ -276,45 +316,89 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
     function connect() {
       if (disposed) return;
 
-      // Browser -> Binance Futures WebSocket can be blocked by region/network policy.
-      // Keep the chart live through our own Next.js API, which already reads Supabase.
+      const applyIncoming = (incoming: Candle[]) => {
+        if (!incoming.length || disposed || intervalRef.current !== interval) return;
+
+        setCandles((current) => {
+          const mergedMap = new Map<number, Candle>();
+          for (const candle of current) mergedMap.set(candle.time, candle);
+          for (const candle of incoming) mergedMap.set(candle.time, candle);
+          const merged = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+
+          candlesRef.current = merged;
+          const latestCandle = merged[merged.length - 1];
+          if (latestCandle) candleSeriesRef.current?.update(toChartCandle(latestCandle));
+
+          const e20 = emaData(merged, 20);
+          const e60 = emaData(merged, 60);
+          const e120 = emaData(merged, 120);
+          if (e20.length) ema20SeriesRef.current?.update(e20[e20.length - 1]);
+          if (e60.length) ema60SeriesRef.current?.update(e60[e60.length - 1]);
+          if (e120.length) ema120SeriesRef.current?.update(e120[e120.length - 1]);
+          return merged;
+        });
+      };
+
+      // Paper Trading에서 사용하는 것과 같은 Binance USDⓈ-M Futures WebSocket 계열을 사용합니다.
+      // interval별 진행 중인 kline을 받아 마지막 candle을 실시간 갱신합니다.
+      const wsInterval = intervalRef.current;
+      socket = new WebSocket(
+        `wss://fstream.binance.com/market/ws/btcusdt@kline_${wsInterval}`,
+      );
+
+      socket.onopen = () => {
+        if (disposed || intervalRef.current !== interval) return;
+        setStatus("live");
+        setError(null);
+        if (fallbackTimer) {
+          clearInterval(fallbackTimer);
+          fallbackTimer = null;
+        }
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as KlinePayload;
+          const k = payload.k;
+          if (!k) return;
+
+          const next: Candle = {
+            time: Math.floor(Number(k.t) / 1000),
+            open: Number(k.o),
+            high: Number(k.h),
+            low: Number(k.l),
+            close: Number(k.c),
+            volume: Number(k.v),
+          };
+
+          if (
+            !Number.isFinite(next.time) ||
+            !Number.isFinite(next.open) ||
+            !Number.isFinite(next.high) ||
+            !Number.isFinite(next.low) ||
+            !Number.isFinite(next.close) ||
+            next.close <= 0
+          ) return;
+
+          applyIncoming([next]);
+          setStatus("live");
+          setError(null);
+        } catch {
+          // malformed exchange payload는 마지막 정상 candle을 유지합니다.
+        }
+      };
+
       const pollLatest = async () => {
-        if (disposed) return;
+        if (disposed || intervalRef.current !== interval) return;
         try {
           const response = await fetch(
-            `/api/market-chart?symbol=BTCUSDT&interval=${intervalRef.current}&limit=2`,
+            `/api/market-chart?symbol=BTCUSDT&interval=${intervalRef.current}&limit=2&_=${Date.now()}`,
             { cache: "no-store" },
           );
           const payload = await response.json();
           if (!response.ok || !payload.ok) throw new Error(payload.error ?? "실시간 차트 데이터 오류");
-          if (disposed || intervalRef.current !== interval) return;
-
-          const incoming = (payload.candles as Candle[] | undefined) ?? [];
-          if (!incoming.length) {
-            setStatus("reconnecting");
-            return;
-          }
-
-          setCandles((current) => {
-            const mergedMap = new Map<number, Candle>();
-            for (const candle of current) mergedMap.set(candle.time, candle);
-            for (const candle of incoming) mergedMap.set(candle.time, candle);
-            const merged = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
-
-            candlesRef.current = merged;
-            const latestCandle = merged[merged.length - 1];
-            if (latestCandle) candleSeriesRef.current?.update(toChartCandle(latestCandle));
-
-            const e20 = emaData(merged, 20);
-            const e60 = emaData(merged, 60);
-            const e120 = emaData(merged, 120);
-            if (e20.length) ema20SeriesRef.current?.update(e20[e20.length - 1]);
-            if (e60.length) ema60SeriesRef.current?.update(e60[e60.length - 1]);
-            if (e120.length) ema120SeriesRef.current?.update(e120[e120.length - 1]);
-            return merged;
-          });
-          setStatus("live");
-          setError(null);
+          applyIncoming((payload.candles as Candle[] | undefined) ?? []);
+          if (!socket || socket.readyState !== WebSocket.OPEN) setStatus("reconnecting");
         } catch (e) {
           if (!disposed) {
             setStatus("reconnecting");
@@ -323,10 +407,26 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
         }
       };
 
-      void pollLatest();
-      retryTimer = setInterval(pollLatest, 3000) as unknown as ReturnType<typeof setTimeout>;
-    }
+      const startFallbackPolling = () => {
+        if (fallbackTimer || disposed) return;
+        void pollLatest();
+        fallbackTimer = setInterval(pollLatest, 3000);
+      };
 
+      socket.onclose = () => {
+        if (disposed) return;
+        setStatus("reconnecting");
+        startFallbackPolling();
+        retryTimer = setTimeout(connect, 2500);
+      };
+
+      socket.onerror = () => {
+        if (disposed) return;
+        setStatus("reconnecting");
+        startFallbackPolling();
+        socket?.close();
+      };
+    }
 
     chart?.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
     void loadHistory();
@@ -334,6 +434,8 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
       disposed = true;
       loadingOlderRef.current = false;
       if (retryTimer) clearTimeout(retryTimer);
+      if (fallbackTimer) clearInterval(fallbackTimer);
+      socket?.close();
       chart?.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
     };
   }, [interval]);
@@ -373,8 +475,9 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
     if (!candles.length) return [] as SeriesMarker<Time>[];
     const first = candles[0].time;
     const last = candles[candles.length - 1].time;
-    return entries
-      .slice(0, 100)
+
+    const entryMarkers = entries
+      .slice(0, 300)
       .flatMap((entry): SeriesMarker<Time>[] => {
         const timestamp = Math.floor(new Date(entry.opened_at).getTime() / 1000);
         if (!Number.isFinite(timestamp) || timestamp < first || timestamp > last) return [];
@@ -388,9 +491,39 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
           shape: isLong ? "arrowUp" : "arrowDown",
           text: `${isLong ? "LONG" : "SHORT"} ENTRY`,
         }];
-      })
+      });
+
+    const exitMarkers = exits
+      .slice(0, 300)
+      .flatMap((exit): SeriesMarker<Time>[] => {
+        const timestamp = Math.floor(new Date(exit.closed_at).getTime() / 1000);
+        if (!Number.isFinite(timestamp) || timestamp < first || timestamp > last) return [];
+        const time = nearestCandleTime(candles, timestamp);
+        if (time == null) return [];
+
+        const isLong = exit.side === "long";
+        const profitable = Number(exit.return_percent) >= 0;
+        const reason = String(exit.close_reason ?? "").toLowerCase();
+        const reasonLabel =
+          reason.includes("take_profit") || reason.includes("tp") ? "TP" :
+          reason.includes("stop_loss") || reason.includes("sl") ? "SL" :
+          reason.includes("max_holding") || reason.includes("time") ? "TIME" :
+          reason.includes("trailing") ? "TRAIL" :
+          reason.includes("break_even") ? "BE" : "EXIT";
+
+        return [{
+          time,
+          // LONG 청산은 매도이므로 위쪽 ↓, SHORT 청산은 매수이므로 아래쪽 ↑
+          position: isLong ? "aboveBar" : "belowBar",
+          color: profitable ? "#38d39f" : "#ff7185",
+          shape: isLong ? "arrowDown" : "arrowUp",
+          text: `${isLong ? "LONG" : "SHORT"} ${reasonLabel} ${signed(Number(exit.return_percent), 2)}%`,
+        }];
+      });
+
+    return [...entryMarkers, ...exitMarkers]
       .sort((a, b) => Number(a.time) - Number(b.time));
-  }, [candles, entries]);
+  }, [candles, entries, exits]);
 
   useEffect(() => {
     markerPluginRef.current?.setMarkers(markers);
@@ -429,7 +562,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
         <span className="ema20-label">EMA 20</span>
         <span className="ema60-label">EMA 60</span>
         <span className="ema120-label">EMA 120</span>
-        <small>{loadingOlder ? "과거 캔들 불러오는 중…" : "왼쪽으로 드래그하면 과거 캔들 자동 로딩 · 실제 모의매매 진입만 표시"}</small>
+        <small>{loadingOlder ? "과거 캔들 불러오는 중…" : "최대 5,000개 과거 캔들 초기 로딩 · 진입/청산 타점 표시 · 왼쪽 추가 로딩 지원"}</small>
       </div>
 
       {primaryPosition && latest && liveMetrics ? (
@@ -472,7 +605,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
 
       <div ref={containerRef} className="tradingview-chart-container" aria-label={`BTCUSDT ${interval} TradingView 실시간 캔들 차트`} />
       <div className="chart-footnote">
-        Binance USDⓈ-M Futures 실시간 데이터 · Charting technology by TradingView Lightweight Charts™ · LONG/SHORT 마커는 실제 모의매매 진입 시점만 표시됩니다.
+        Binance USDⓈ-M Futures WebSocket 실시간 데이터 · Paper Trading ENTRY / EXIT 마커 · 연결 실패 시 Supabase 자동 fallback · Charting technology by TradingView Lightweight Charts™
       </div>
     </section>
   );

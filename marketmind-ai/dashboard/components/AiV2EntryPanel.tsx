@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import type { AiDecisionV2Snapshot } from "../types";
 
 const conditionLabels: Record<string, string> = {
@@ -37,10 +40,64 @@ function actionText(action:string|null|undefined, preferred:string|null|undefine
   return String(action??"대기").toUpperCase();
 }
 
+
+function useBinanceRealtimePrice() {
+  const [price, setPrice] = useState<number | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let socket: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      if (disposed) return;
+      socket = new WebSocket("wss://fstream.binance.com/market/ws/btcusdt@markPrice@1s");
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as { p?: string };
+          const next = Number(payload.p);
+          if (!disposed && Number.isFinite(next) && next > 0) setPrice(next);
+        } catch {}
+      };
+      socket.onclose = () => {
+        if (!disposed) retryTimer = setTimeout(connect, 2500);
+      };
+      socket.onerror = () => socket?.close();
+    };
+
+    connect();
+    return () => {
+      disposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      socket?.close();
+    };
+  }, []);
+
+  return price;
+}
+
+function liveDistancePercent(current: number | null, target: number | null | undefined) {
+  const c = Number(current);
+  const t = Number(target);
+  if (!Number.isFinite(c) || !Number.isFinite(t) || c <= 0 || t <= 0) return null;
+  return ((t - c) / c) * 100;
+}
+
+function distanceLabel(value: number | null) {
+  if (value === null) return "실시간 거리 계산 중";
+  if (Math.abs(value) < 0.005) return "현재 가격대";
+  return `실시간 ${value > 0 ? "+" : ""}${value.toFixed(3)}%`;
+}
+
 export function AiV2EntryPanel({ data }: { data: AiDecisionV2Snapshot | null }) {
+  const realtimePrice = useBinanceRealtimePrice();
   if (!data) return <section className="panel mm-v2-entry"><div className="panel-title-row"><h2>AI V2 · Entry Plan</h2></div><p className="mm-v2-empty">V2 판단 데이터를 기다리고 있습니다.</p></section>;
   const plan=data.entry_plan, trigger=data.entry_trigger;
   const blockers=trigger?.blockers ?? [];
+  const referencePlan=trigger?.referencePlan??plan;
+  const firstLiveDistance=liveDistancePercent(realtimePrice,plan?.firstInterestPrice);
+  const secondLiveDistance=liveDistancePercent(realtimePrice,plan?.secondInterestPrice);
+  const invalidationLiveDistance=liveDistancePercent(realtimePrice,referencePlan?.invalidationPrice);
   return <section className="panel mm-v2-entry">
     <div className="panel-title-row"><h2>AI V2 · Entry Plan</h2><span className={`mm-trigger-badge s-${(trigger?.status??"UNAVAILABLE").toLowerCase()}`}>{statusText(trigger?.status)}</span></div>
     <div className="mm-v2-summary">
@@ -49,11 +106,10 @@ export function AiV2EntryPanel({ data }: { data: AiDecisionV2Snapshot | null }) 
       <div className="mm-v2-metric"><span>진입 품질</span><strong>{n(data.entry_quality_score,0)} <em>/ 100</em></strong><small>{entryQualityText(data.entry_quality_score)}</small></div>
       <div className={`mm-v2-metric heat-${Number(data.overheat_risk)>=85?"extreme":Number(data.overheat_risk)>55?"high":"normal"}`}><span>과열 위험</span><strong>{n(data.overheat_risk,0)} <em>/ 100</em></strong><small>{heatText(data.overheat_risk)} · 반전 위험 {n(data.reversal_risk,1)}</small></div>
     </div>
-    {plan ? <div className="mm-entry-prices">
-      <div><span>현재가</span><strong>${n(plan.currentPrice,2)}</strong></div>
-      <div className="interest first"><span>1차 관심가 <b>WATCH</b></span><strong>${n(plan.firstInterestPrice,2)}</strong><small>{plan.firstDistancePercent!=null?`-${n(plan.firstDistancePercent,3)}%`:""} · 예상 진입점수 {n(plan.firstInterestEstimatedScore,1)}</small></div>
-      <div className="interest second"><span>2차 관심가 <b>RE-EVALUATE</b></span><strong>${n(plan.secondInterestPrice,2)}</strong><small>{plan.secondDistancePercent!=null?`-${n(plan.secondDistancePercent,3)}%`:""} · 예상 진입점수 {n(plan.secondInterestEstimatedScore,1)}</small></div>
-      <div className="invalid"><span>무효화</span><strong>${n((trigger?.referencePlan??plan).invalidationPrice,2)}</strong><small>고정 기준 Plan</small></div>
+    {plan ? <div className="mm-entry-prices mm-entry-prices-targets">
+      <div className="interest first"><span>1차 관심가 <b>WATCH</b></span><strong>${n(plan.firstInterestPrice,2)}</strong><small>{distanceLabel(firstLiveDistance)} · 예상 진입점수 {n(plan.firstInterestEstimatedScore,1)}</small></div>
+      <div className="interest second"><span>2차 관심가 <b>RE-EVALUATE</b></span><strong>${n(plan.secondInterestPrice,2)}</strong><small>{distanceLabel(secondLiveDistance)} · 예상 진입점수 {n(plan.secondInterestEstimatedScore,1)}</small></div>
+      <div className="invalid"><span>무효화 <b>FIXED PLAN</b></span><strong>${n(referencePlan?.invalidationPrice,2)}</strong><small>{distanceLabel(invalidationLiveDistance)} · 고정 기준 Plan</small></div>
     </div>:null}
     {trigger ? <>
       <div className="mm-trigger-progress"><div><strong>Trigger {statusText(trigger.status)}</strong><span>{trigger.passedConditions}/{trigger.totalConditions} 조건 충족</span></div><i><b style={{width:`${Math.min(100,(trigger.passedConditions/Math.max(1,trigger.totalConditions))*100)}%`}} /></i></div>

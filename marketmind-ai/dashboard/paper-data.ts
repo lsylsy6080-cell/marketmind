@@ -414,7 +414,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .select("*")
         .eq("account_id", accountId)
         .order("closed_at", { ascending: false })
-        .limit(100),
+        .limit(500),
       supabase
         .from("paper_strategy_runs")
         .select("*")

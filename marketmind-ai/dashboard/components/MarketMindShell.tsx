@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatDateTime, formatRelativeTime } from "../format";
+import { DashboardRefreshControl } from "./DashboardRefreshControl";
 
 type ActivePage = "dashboard" | "trading" | "project-center";
 
 type MarketMindShellProps = {
   active: ActivePage;
   updatedAt: string;
+  workerUpdatedAt?: string | null;
   children: ReactNode;
 };
 
@@ -16,7 +18,7 @@ const navItems = [
   { id: "project-center" as const, href: "/project-center", icon: "⬡", label: "프로젝트 센터" },
 ];
 
-export function MarketMindShell({ active, updatedAt, children }: MarketMindShellProps) {
+export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, children }: MarketMindShellProps) {
   return (
     <main className="mm-app-shell">
       <aside className="mm-sidebar">
@@ -66,8 +68,9 @@ export function MarketMindShell({ active, updatedAt, children }: MarketMindShell
             <span className="mm-status-pill green"><i/>Online</span>
             <span className="mm-status-pill cyan"><i/>Worker Online</span>
             <span className="mm-status-pill purple"><i/>AI Active</span>
+            {active === "dashboard" ? <DashboardRefreshControl workerUpdatedAt={workerUpdatedAt} /> : null}
             <div className="mm-top-meta">
-              <span>{formatRelativeTime(updatedAt)}</span>
+              <span>AI {formatRelativeTime(updatedAt)}</span>
               <small>{formatDateTime(updatedAt)}</small>
               <span className="mm-user-dot">M</span>
             </div>
