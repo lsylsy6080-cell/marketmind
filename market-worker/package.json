@@ -30,7 +30,11 @@
     "funding:audit:run": "tsx scripts/run-funding-raw-audit.ts",
     "battle:test": "tsx src/performance-battle/PerformanceBattleEngine.test.ts",
     "battle:run": "tsx scripts/run-performance-battle.ts",
-    "battle:dry": "PERFORMANCE_BATTLE_DRY_RUN=true tsx scripts/run-performance-battle.ts"
+    "battle:dry": "PERFORMANCE_BATTLE_DRY_RUN=true tsx scripts/run-performance-battle.ts",
+    "sizing:test": "tsx src/position-sizing/AdaptivePositionSizingEngine.test.ts",
+    "sizing:run": "tsx scripts/run-adaptive-sizing.ts",
+    "sizing:dry": "ADAPTIVE_SIZING_DRY_RUN=true tsx scripts/run-adaptive-sizing.ts",
+    "worker:lock:status": "tsx scripts/check-worker-lock.ts"
   },
   "keywords": [],
   "author": "",

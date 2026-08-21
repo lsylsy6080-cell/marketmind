@@ -14,6 +14,7 @@ import { generateBtcNewsScore } from "./news/btc-news-score";
 import { runPaperTradingWorker } from "./paper/run-paper-trading-worker";
 import { runMarketRegimeV2 } from "./regime/run-market-regime-v2";
 import { runDecisionV2 } from "./decision-v2/run-decision-v2";
+import { runAdaptiveSizing } from "./position-sizing/run-adaptive-sizing";
 import { refreshSignalCalibrationIfStale } from "./calibration/refresh-signal-calibration";
 import { WorkerExecutionTracker } from "./operations/WorkerExecutionTracker";
 import { supabase } from "./lib/supabase";
@@ -124,6 +125,12 @@ async function main(): Promise<void> {
     let decisionV2Summary = "V2 N/A";
     try {
       const decisionV2 = await runDecisionV2();
+      try {
+        await runAdaptiveSizing();
+      } catch (sizingError) {
+        const sizingMessage = sizingError instanceof Error ? sizingError.message : String(sizingError);
+        rootError(`[${formatKst()}] ⚠️ Adaptive Sizing shadow 비활성 | ${sizingMessage}`);
+      }
       decisionV2Summary =
         `V2 ${decisionV2.action.toUpperCase()} ${decisionV2.direction}` +
         ` trend=${decisionV2.marketTrendStrength.toFixed(0)}` +
