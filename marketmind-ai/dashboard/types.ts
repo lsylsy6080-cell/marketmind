@@ -58,6 +58,29 @@ export interface DashboardData {
 }
 
 
+
+export type EntryPlanV2 = {
+  status: string; side: string; currentPrice: number | null; firstInterestPrice: number | null;
+  secondInterestPrice: number | null; invalidationPrice: number | null; currentEntryScore: number;
+  firstInterestEstimatedScore: number | null; secondInterestEstimatedScore: number | null;
+  firstDistancePercent: number | null; secondDistancePercent: number | null; invalidationDistancePercent: number | null;
+  basis?: string[];
+};
+export type EntryTriggerV2 = {
+  status: "WATCH" | "RE_EVALUATE" | "READY" | "INVALIDATED" | "UNAVAILABLE";
+  zone: string; referencePlanSource: string; referencePlanCalculatedAt: string | null; referencePlan?: EntryPlanV2 | null;
+  currentPrice: number | null; conditions: Record<string, boolean>; passedConditions: number; totalConditions: number;
+  readyThreshold: number; blockers: string[]; reasons: string[];
+};
+export type AiDecisionV2Snapshot = {
+  id: number; symbol: string; calculated_at: string; direction_score: number | null; market_trend_strength: number | null;
+  direction_strength: number | null; final_score: number | null; final_confidence: number | null; direction: string | null;
+  action: string | null; entry_quality_score: number | null; entry_quality: string | null; overheat_risk: number | null;
+  reversal_risk: number | null; data_reliability: number | null; risk_level: string | null; trading_permission: string | null;
+  preferred_entry: string | null; entry_plan: EntryPlanV2 | null; entry_trigger: EntryTriggerV2 | null;
+  strategy_version: string | null;
+};
+
 // Paper Trading types
 export type JsonValue =
   | string
@@ -374,6 +397,7 @@ export type PaperTradingData = {
   equity: PaperEquitySnapshot[];
   decisionsById: Record<number, FinalMarketDecision>;
   marketPrice: number | null;
+  decisionV2: AiDecisionV2Snapshot | null;
   error: string | null;
 };
 

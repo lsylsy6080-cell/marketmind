@@ -1,5 +1,6 @@
 import { createAdminClient } from "../lib/supabase/admin";
 import type {
+  AiDecisionV2Snapshot,
   BacktestSummary,
   FinalMarketBacktest,
   FinalMarketDecision,
@@ -90,6 +91,7 @@ export const emptyPaperTradingData: PaperTradingData = {
   equity: [],
   decisionsById: {},
   marketPrice: null,
+  decisionV2: null,
   error: null,
 };
 
@@ -270,6 +272,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
       fundingResult,
       backtestsResult,
       performanceResult,
+      decisionV2Result,
     ] = await Promise.all([
       supabase
         .from("paper_trading_accounts")
@@ -303,6 +306,13 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .eq("symbol", "BTCUSDT")
         .order("evaluated_at", { ascending: false })
         .limit(200),
+      supabase
+        .from("ai_decision_v2_snapshots")
+        .select("id,symbol,calculated_at,direction_score,market_trend_strength,direction_strength,final_score,final_confidence,direction,action,entry_quality_score,entry_quality,overheat_risk,reversal_risk,data_reliability,risk_level,trading_permission,preferred_entry,entry_plan,entry_trigger,strategy_version")
+        .eq("symbol", "BTCUSDT")
+        .order("calculated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     const globalError = [
@@ -310,6 +320,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
       fundingResult.error,
       backtestsResult.error,
       performanceResult.error,
+      decisionV2Result.error,
     ].find(Boolean);
     if (globalError) throw globalError;
 
@@ -343,9 +354,16 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
     const backtests = (backtestsResult.data ?? []) as FinalMarketBacktest[];
     const performance =
       (performanceResult.data ?? []) as FinalMarketPerformance[];
+    const decisionV2 = decisionV2Result.data
+      ? nullableNumericRow<AiDecisionV2Snapshot>(decisionV2Result.data, [
+          "direction_score", "market_trend_strength", "direction_strength", "final_score", "final_confidence",
+          "entry_quality_score", "overheat_risk", "reversal_risk", "data_reliability",
+        ])
+      : null;
     const globalData = {
       decisions,
       funding,
+      decisionV2,
       backtestSummary: summarizeBacktests(backtests),
       performanceSummary: summarizePerformance(performance),
     };

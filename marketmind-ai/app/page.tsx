@@ -1,3 +1,4 @@
+import { AiV2EntryPanel } from "@/dashboard/components/AiV2EntryPanel";
 import { AiInsightPanel } from "@/dashboard/components/AiInsightPanel";
 import { ComponentCards } from "@/dashboard/components/ComponentCards";
 import { ConsensusPanel } from "@/dashboard/components/ConsensusPanel";
@@ -55,6 +56,7 @@ export default async function HomePage() {
               <LiveBitcoinChart entries={tradeEntries} positions={dashboardData.openPositions} />
               <CurrentDecision decision={latestDecision} />
             </section>
+            <AiV2EntryPanel data={dashboardData.decisionV2} />
             <section className="mm-analysis-row">
               <SignalComposition decision={latestDecision} />
               <AiInsightPanel decision={latestDecision} />

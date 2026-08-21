@@ -84,7 +84,7 @@
   gap: 8px;
   margin-bottom: 12px;
   color: #a88aff;
-  font-size:13px;
+  font-size:17px;
   font-weight: 800;
   letter-spacing: 0.16em;
 }
@@ -146,7 +146,7 @@
 
 .heroStatus span {
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
 }
 
 .heroStatus strong {
@@ -176,7 +176,7 @@
 
 .heroStats span {
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
 }
 
 .heroStats strong {
@@ -185,7 +185,7 @@
 
 .heroStats small {
   color: var(--pc-soft);
-  font-size:13px;
+  font-size:17px;
 }
 
 .primaryGrid {
@@ -269,7 +269,7 @@
   border-radius: 999px;
   color: #cbb9ff;
   background: rgba(139, 92, 246, 0.09);
-  font-size:13px;
+  font-size:17px;
   font-weight: 800;
 }
 
@@ -349,7 +349,7 @@
   gap: 7px;
   padding: 7px 10px;
   border-radius: 999px;
-  font-size:13px;
+  font-size:17px;
   font-weight: 800;
 }
 
@@ -378,7 +378,7 @@
 
 .scorePhase {
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
 }
 
 .scoreStars {
@@ -409,7 +409,7 @@
   justify-content: space-between;
   margin-bottom: 8px;
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
 }
 
 .scoreProgressMeta strong {
@@ -452,12 +452,12 @@
 
 .scoreFooter span {
   color: var(--pc-soft);
-  font-size:12px;
+  font-size:16px;
 }
 
 .scoreFooter strong {
   overflow: hidden;
-  font-size:13px;
+  font-size:17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -508,7 +508,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -551,11 +551,11 @@
 
 .serviceState span {
   color: var(--pc-soft);
-  font-size:12px;
+  font-size:16px;
 }
 
 .serviceState strong {
-  font-size:13px;
+  font-size:17px;
 }
 
 .statusFooter {
@@ -566,7 +566,7 @@
   padding-top: 16px;
   border-top: 1px solid var(--pc-line);
   color: var(--pc-soft);
-  font-size:12px;
+  font-size:16px;
 }
 
 .statusFooter .liveIndicator {
@@ -583,7 +583,7 @@
 
 .averageProgress span {
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
 }
 
 .averageProgress strong {
@@ -612,7 +612,7 @@
 .progressItemHeader p {
   margin: 4px 0 0;
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
 }
 
 .progressValue {
@@ -624,7 +624,7 @@
 
 .progressValue span {
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
 }
 
 .progressValue strong {
@@ -724,7 +724,7 @@
   border-radius: 999px;
   color: #b9a1ff;
   background: rgba(139, 92, 246, 0.07);
-  font-size:11px;
+  font-size:15px;
 }
 
 .focusCard h3 {
@@ -735,7 +735,7 @@
 .focusCard p {
   margin: 0;
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
   line-height: 1.7;
 }
 
@@ -888,7 +888,7 @@
   border-radius: 10px;
   background: rgba(8, 10, 19, 0.55);
   color: #a88aff;
-  font-size:13px;
+  font-size:17px;
 }
 
 .heroCommand code {
@@ -898,7 +898,7 @@
 
 .heroStatus small {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .remasterGrid {
@@ -948,7 +948,7 @@
   gap: 7px;
   padding: 7px 10px;
   border-radius: 999px;
-  font-size:12px;
+  font-size:16px;
   font-weight: 900;
   letter-spacing: 0.08em;
 }
@@ -1021,7 +1021,7 @@
   display: block;
   margin-bottom: 4px;
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
 }
 
 .aiRecommendationHeader h3 {
@@ -1055,7 +1055,7 @@
 .confidenceHeader span,
 .releaseProgressHeader span {
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
 }
 
 .confidenceHeader strong {
@@ -1098,7 +1098,7 @@
 
 .aiMetrics span {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .aiMetrics strong {
@@ -1113,7 +1113,7 @@
 
 .checklistTitle {
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
   font-weight: 700;
 }
 
@@ -1141,14 +1141,14 @@
   border-radius: 8px;
   color: #bda9ff;
   background: rgba(139, 92, 246, 0.055);
-  font-size:11px;
+  font-size:15px;
   font-weight: 900;
 }
 
 .aiChecklist p {
   margin: 0;
   color: #b5bdce;
-  font-size:13px;
+  font-size:17px;
   line-height: 1.5;
 }
 
@@ -1230,7 +1230,7 @@
   display: block;
   margin-bottom: 3px;
   color: #a991f1;
-  font-size:12px;
+  font-size:16px;
   font-weight: 900;
 }
 
@@ -1243,7 +1243,7 @@
   flex: 0 0 auto;
   padding: 5px 8px;
   border-radius: 999px;
-  font-size:11px;
+  font-size:15px;
   font-weight: 800;
 }
 
@@ -1265,13 +1265,13 @@
 .releaseContent > p {
   margin: 7px 0 12px;
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
   line-height: 1.55;
 }
 
 .releaseProgressHeader strong {
   color: #aeb8ca;
-  font-size:12px;
+  font-size:16px;
 }
 
 .releaseProgressTrack > span {
@@ -1335,7 +1335,7 @@
 .activityItem time {
   color: var(--pc-soft);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size:11px;
+  font-size:15px;
 }
 
 .activityDot {
@@ -1360,21 +1360,21 @@
 
 .activityContent strong {
   overflow: hidden;
-  font-size:13px;
+  font-size:17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .activityContent span {
   flex: 0 0 auto;
-  font-size:11px;
+  font-size:15px;
   font-weight: 800;
 }
 
 .activityContent p {
   margin: 10px 0 0;
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
   line-height: 1.55;
 }
 
@@ -1397,7 +1397,7 @@
 .activityFooter {
   margin: 18px 28px 24px;
   color: var(--pc-soft);
-  font-size:12px;
+  font-size:16px;
 }
 
 @keyframes aiOrbSpin {
@@ -1514,7 +1514,7 @@
   gap: 7px;
   padding: 7px 10px;
   border-radius: 999px;
-  font-size:12px;
+  font-size:16px;
   font-weight: 900;
 }
 
@@ -1545,7 +1545,7 @@
 
 .gitRepositoryMeta span {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
   font-weight: 800;
   letter-spacing: 0.12em;
 }
@@ -1615,13 +1615,13 @@
 
 .gitCommitTop code {
   color: #b9a4ff;
-  font-size:12px;
+  font-size:16px;
 }
 
 .gitCommitTop time,
 .gitCommitFooter span {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .gitCommitContent > strong {
@@ -1638,7 +1638,7 @@
 .gitCommitFooter a,
 .environmentState a {
   color: #8fc4ff;
-  font-size:11px;
+  font-size:15px;
   text-decoration: none;
 }
 
@@ -1667,7 +1667,7 @@
 .buildEmptyState p {
   margin: 8px 0 0;
   color: var(--pc-muted);
-  font-size:12px;
+  font-size:16px;
   line-height: 1.6;
 }
 
@@ -1728,7 +1728,7 @@
 
 .buildHero span {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
@@ -1744,7 +1744,7 @@
 .buildHero small,
 .buildIdentity code {
   color: var(--pc-muted);
-  font-size:11px;
+  font-size:15px;
 }
 
 .buildIdentity {
@@ -1790,7 +1790,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--pc-muted);
-  font-size:11px;
+  font-size:15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1804,11 +1804,11 @@
 
 .environmentState > span {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .environmentState strong {
-  font-size:11px;
+  font-size:15px;
 }
 
 @media (max-width: 980px) {
@@ -1876,7 +1876,7 @@
   gap: 7px;
   padding: 8px 11px;
   border-radius: 999px;
-  font-size:12px;
+  font-size:16px;
   font-weight: 900;
   letter-spacing: 0.1em;
 }
@@ -1943,7 +1943,7 @@
 
 .decisionHeadline > div:last-child > span {
   color: var(--pc-soft);
-  font-size:12px;
+  font-size:16px;
   font-weight: 800;
   letter-spacing: 0.09em;
 }
@@ -1957,7 +1957,7 @@
 .decisionHeadline p {
   margin: 0;
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
   line-height: 1.7;
 }
 
@@ -1979,7 +1979,7 @@
 .decisionMetricGrid span {
   display: block;
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .decisionMetricGrid strong {
@@ -2024,13 +2024,13 @@
 }
 
 .decisionSectionTitle span {
-  font-size:13px;
+  font-size:17px;
   font-weight: 800;
 }
 
 .decisionSectionTitle small {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .factorGrid {
@@ -2079,7 +2079,7 @@
 
 .factorTop strong {
   overflow: hidden;
-  font-size:13px;
+  font-size:17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2088,13 +2088,13 @@
   flex: 0 0 auto;
   color: #cbbcff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size:12px;
+  font-size:16px;
 }
 
 .factorItem p {
   margin: 9px 0 0;
   color: var(--pc-muted);
-  font-size:11px;
+  font-size:15px;
   line-height: 1.55;
 }
 
@@ -2106,7 +2106,7 @@
   padding-top: 15px;
   border-top: 1px solid var(--pc-line);
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .decisionEmptyState,
@@ -2120,13 +2120,13 @@
 .decisionHistoryEmpty p {
   margin: 0;
   color: var(--pc-muted);
-  font-size:13px;
+  font-size:17px;
   line-height: 1.6;
 }
 
 .decisionEmptyState small {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .decisionHistoryList {
@@ -2199,7 +2199,7 @@
 .decisionHistoryTop span,
 .decisionHistoryTop time {
   color: var(--pc-soft);
-  font-size:11px;
+  font-size:15px;
 }
 
 .decisionHistoryMeta {
@@ -2213,7 +2213,7 @@
   border-radius: 999px;
   color: var(--pc-muted);
   background: rgba(148, 163, 184, 0.055);
-  font-size:11px;
+  font-size:15px;
 }
 
 .historySignal {
@@ -2227,7 +2227,7 @@
 .decisionHistoryContent p {
   margin: 9px 0 0;
   color: var(--pc-muted);
-  font-size:11px;
+  font-size:15px;
   line-height: 1.55;
 }
 
@@ -2275,11 +2275,11 @@
   border-radius: 12px;
   background: rgba(139, 92, 246, 0.035);
 }
-.brainStatusGrid span { display: block; color: var(--pc-soft); font-size:11px; }
-.brainStatusGrid strong { display: block; overflow: hidden; margin-top: 6px; color: #d9d0ff; font-size:13px; text-overflow: ellipsis; white-space: nowrap; }
+.brainStatusGrid span { display: block; color: var(--pc-soft); font-size:15px; }
+.brainStatusGrid strong { display: block; overflow: hidden; margin-top: 6px; color: #d9d0ff; font-size:17px; text-overflow: ellipsis; white-space: nowrap; }
 .factorWeight { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
-.factorWeight > span { color: var(--pc-soft); font-size:11px; }
-.factorWeight > strong { color: #bba8ff; font-size:11px; }
+.factorWeight > span { color: var(--pc-soft); font-size:15px; }
+.factorWeight > strong { color: #bba8ff; font-size:15px; }
 .factorWeight > div { grid-column: 1 / -1; overflow: hidden; height: 4px; border-radius: 999px; background: rgba(148, 163, 184, 0.09); }
 .factorWeight > div > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7046df, #43d5a1); }
 @media (max-width: 620px) { .brainStatusGrid { grid-template-columns: 1fr; } }
@@ -2400,7 +2400,7 @@
 
 .brainStatusGrid { gap: 12px; margin-top: 12px; }
 .brainStatusGrid > div { padding: 17px 18px; }
-.brainStatusGrid span { font-size:13px; }
+.brainStatusGrid span { font-size:17px; }
 .brainStatusGrid strong { margin-top: 8px; font-size:16px; }
 
 .decisionFactors { margin-top: 26px; padding-top: 24px; }
@@ -2413,10 +2413,10 @@
 .factorTop > span { font-size:16px; font-weight: 800; }
 .factorTop i { width: 9px; height: 9px; }
 .factorItem p { margin-top: 12px; font-size:14px; line-height: 1.65; }
-.factorWeight > span { font-size:13px; }
+.factorWeight > span { font-size:17px; }
 .factorWeight > strong { font-size:14px; }
 .factorWeight > div { height: 6px; }
-.decisionFooter { margin-top: 24px; padding-top: 18px; font-size:13px; }
+.decisionFooter { margin-top: 24px; padding-top: 18px; font-size:17px; }
 
 .decisionHistoryList { padding: 28px 32px 34px; }
 .decisionHistoryItem { grid-template-columns: 26px minmax(0,1fr); gap: 14px; }
@@ -2426,9 +2426,9 @@
 .decisionHistoryTop span,
 .decisionHistoryTop time { font-size:14px; }
 .decisionHistoryMeta { gap: 8px; margin-top: 10px; }
-.decisionHistoryMeta > span { padding: 6px 9px; font-size:13px; }
+.decisionHistoryMeta > span { padding: 6px 9px; font-size:17px; }
 .decisionHistoryContent p { margin-top: 11px; font-size:14px; line-height: 1.65; }
-.timelineCount { font-size:13px; }
+.timelineCount { font-size:17px; }
 
 /* Raise tiny text throughout Project Center without changing layout semantics. */
 .projectCenter :where(small) { font-size:max(13px, .72em); }

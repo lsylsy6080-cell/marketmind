@@ -90,8 +90,13 @@ export async function GET() {
     const [candleResult, decisionResult] = await Promise.all([
       supabase
         .from("market_candles")
-        .select("candle_open_time")
-        .order("candle_open_time", { ascending: false })
+        .select("open_time")
+        .eq("exchange", "binance")
+        .eq("market_type", "spot")
+        .eq("symbol", "BTCUSDT")
+        .eq("timeframe", "1m")
+        .eq("is_closed", true)
+        .order("open_time", { ascending: false })
         .limit(1)
         .maybeSingle(),
       supabase
@@ -106,7 +111,7 @@ export async function GET() {
 
     if (candleResult.error) throw candleResult.error;
 
-    const candleAt = candleResult.data?.candle_open_time ?? null;
+    const candleAt = candleResult.data?.open_time ?? null;
     const workerAge = ageMinutes(candleAt);
     const workerStatus = freshnessStatus(workerAge);
 

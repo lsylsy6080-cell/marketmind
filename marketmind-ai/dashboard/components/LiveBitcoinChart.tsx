@@ -19,10 +19,10 @@ import {
 } from "lightweight-charts";
 import type { PaperPosition } from "../types";
 import { calculateLivePositionMetrics } from "../live-position";
-import { useLiveBtcPrice } from "../hooks/useLiveBtcPrice";
 
 type Interval = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
+type KlinePayload = { e?: string; k?: { t: number; o: string; h: string; l: string; c: string; v: string } };
 type TradeEntryMarker = { opened_at: string; side: "long" | "short"; entry_price: number };
 
 const intervals: { value: Interval; label: string }[] = [
@@ -33,20 +33,6 @@ const intervals: { value: Interval; label: string }[] = [
   { value: "4h", label: "4시간" },
   { value: "1d", label: "1일" },
 ];
-
-const intervalSeconds: Record<Interval, number> = {
-  "1m": 60,
-  "5m": 5 * 60,
-  "15m": 15 * 60,
-  "1h": 60 * 60,
-  "4h": 4 * 60 * 60,
-  "1d": 24 * 60 * 60,
-};
-
-function candleBucketStart(timestampSeconds: number, interval: Interval) {
-  const seconds = intervalSeconds[interval];
-  return Math.floor(timestampSeconds / seconds) * seconds;
-}
 
 function emaData(candles: Candle[], period: number) {
   if (!candles.length) return [];
@@ -111,7 +97,6 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
   const [status, setStatus] = useState<"loading" | "live" | "reconnecting" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const { price: liveBtcPrice, status: livePriceStatus } = useLiveBtcPrice(null);
 
   useEffect(() => {
     intervalRef.current = interval;
@@ -194,6 +179,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
 
   useEffect(() => {
     let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const chart = chartRef.current;
 
     function applyAllSeries(history: Candle[]) {
@@ -213,9 +199,10 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
       const visibleRange = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
 
       try {
+        // endTime is exclusive enough for our purpose by asking for 1 ms before the oldest candle.
         const endTime = current[0].time * 1000 - 1;
         const response = await fetch(
-          `/api/market-chart?symbol=BTCUSDT&interval=${intervalRef.current}&limit=500&endTime=${endTime}`,
+          `/api/market-chart?symbol=BTCUSDT&interval=${intervalRef.current}&limit=1000&endTime=${endTime}`,
           { cache: "no-store" },
         );
         const payload = await response.json();
@@ -233,6 +220,8 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
         setCandles(merged);
         applyAllSeries(merged);
 
+        // Prepending bars changes logical indexes. Shift the viewport by the number of added bars
+        // so the user keeps looking at exactly the same candles while older history appears on the left.
         if (visibleRange) {
           chartRef.current?.timeScale().setVisibleLogicalRange({
             from: visibleRange.from + older.length,
@@ -249,6 +238,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
 
     const handleVisibleRangeChange = (range: { from: number; to: number } | null) => {
       if (!range || disposed) return;
+      // Load the next block before the user actually reaches the first candle.
       if (range.from < 50) void fetchOlderHistory();
     };
 
@@ -258,8 +248,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
       loadingOlderRef.current = false;
       hasMoreHistoryRef.current = true;
       try {
-        // EMA120 계산에 충분한 히스토리만 먼저 가져와 초기 렌더링을 가볍게 합니다.
-        const response = await fetch(`/api/market-chart?symbol=BTCUSDT&interval=${interval}&limit=240`, { cache: "no-store" });
+        const response = await fetch(`/api/market-chart?symbol=BTCUSDT&interval=${interval}&limit=500`, { cache: "no-store" });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error ?? "차트 데이터 오류");
         if (disposed) return;
@@ -274,76 +263,80 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
             to: history.length + 5,
           });
         }
-        setStatus("reconnecting");
       } catch (e) {
         if (!disposed) {
           setStatus("error");
           setError(e instanceof Error ? e.message : "차트 데이터를 불러오지 못했습니다.");
         }
+        return;
       }
+      connect();
     }
+
+    function connect() {
+      if (disposed) return;
+
+      // Browser -> Binance Futures WebSocket can be blocked by region/network policy.
+      // Keep the chart live through our own Next.js API, which already reads Supabase.
+      const pollLatest = async () => {
+        if (disposed) return;
+        try {
+          const response = await fetch(
+            `/api/market-chart?symbol=BTCUSDT&interval=${intervalRef.current}&limit=2`,
+            { cache: "no-store" },
+          );
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.error ?? "실시간 차트 데이터 오류");
+          if (disposed || intervalRef.current !== interval) return;
+
+          const incoming = (payload.candles as Candle[] | undefined) ?? [];
+          if (!incoming.length) {
+            setStatus("reconnecting");
+            return;
+          }
+
+          setCandles((current) => {
+            const mergedMap = new Map<number, Candle>();
+            for (const candle of current) mergedMap.set(candle.time, candle);
+            for (const candle of incoming) mergedMap.set(candle.time, candle);
+            const merged = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+
+            candlesRef.current = merged;
+            const latestCandle = merged[merged.length - 1];
+            if (latestCandle) candleSeriesRef.current?.update(toChartCandle(latestCandle));
+
+            const e20 = emaData(merged, 20);
+            const e60 = emaData(merged, 60);
+            const e120 = emaData(merged, 120);
+            if (e20.length) ema20SeriesRef.current?.update(e20[e20.length - 1]);
+            if (e60.length) ema60SeriesRef.current?.update(e60[e60.length - 1]);
+            if (e120.length) ema120SeriesRef.current?.update(e120[e120.length - 1]);
+            return merged;
+          });
+          setStatus("live");
+          setError(null);
+        } catch (e) {
+          if (!disposed) {
+            setStatus("reconnecting");
+            setError(e instanceof Error ? e.message : "실시간 차트를 갱신하지 못했습니다.");
+          }
+        }
+      };
+
+      void pollLatest();
+      retryTimer = setInterval(pollLatest, 3000) as unknown as ReturnType<typeof setTimeout>;
+    }
+
 
     chart?.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
     void loadHistory();
     return () => {
       disposed = true;
       loadingOlderRef.current = false;
+      if (retryTimer) clearTimeout(retryTimer);
       chart?.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
     };
   }, [interval]);
-
-  // 모의 트레이딩과 동일한 Binance 실시간 가격을 사용해 현재 진행 중 캔들을 즉시 갱신합니다.
-  useEffect(() => {
-    if (liveBtcPrice === null || !Number.isFinite(liveBtcPrice) || liveBtcPrice <= 0) {
-      setStatus((current) =>
-        current === "loading" || current === "error" ? current : "reconnecting",
-      );
-      return;
-    }
-
-    const bucketTime = candleBucketStart(Math.floor(Date.now() / 1000), intervalRef.current);
-    const current = candlesRef.current;
-    const last = current[current.length - 1] ?? null;
-
-    let next: Candle;
-    if (last && last.time === bucketTime) {
-      next = {
-        ...last,
-        high: Math.max(last.high, liveBtcPrice),
-        low: Math.min(last.low, liveBtcPrice),
-        close: liveBtcPrice,
-      };
-    } else if (!last || bucketTime > last.time) {
-      next = {
-        time: bucketTime,
-        open: liveBtcPrice,
-        high: liveBtcPrice,
-        low: liveBtcPrice,
-        close: liveBtcPrice,
-        volume: 0,
-      };
-    } else {
-      return;
-    }
-
-    const updated = last && last.time === bucketTime
-      ? [...current.slice(0, -1), next]
-      : [...current, next];
-
-    candlesRef.current = updated;
-    setCandles(updated);
-    candleSeriesRef.current?.update(toChartCandle(next));
-
-    const e20 = emaData(updated, 20);
-    const e60 = emaData(updated, 60);
-    const e120 = emaData(updated, 120);
-    if (e20.length) ema20SeriesRef.current?.update(e20[e20.length - 1]);
-    if (e60.length) ema60SeriesRef.current?.update(e60[e60.length - 1]);
-    if (e120.length) ema120SeriesRef.current?.update(e120[e120.length - 1]);
-
-    setStatus(livePriceStatus === "live" ? "live" : "reconnecting");
-    if (livePriceStatus === "live") setError(null);
-  }, [liveBtcPrice, livePriceStatus]);
 
   const primaryPosition = positions[0] ?? null;
 
@@ -404,12 +397,11 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
   }, [markers]);
 
   const latest = candles[candles.length - 1] ?? null;
-  const displayPrice = liveBtcPrice ?? latest?.close ?? null;
   const firstVisible = candles[Math.max(0, candles.length - 96)] ?? null;
-  const change = displayPrice !== null && firstVisible ? ((displayPrice - firstVisible.open) / firstVisible.open) * 100 : null;
-  const liveMetrics = displayPrice !== null && primaryPosition ? calculateLivePositionMetrics(primaryPosition, displayPrice) : null;
-  const aggregatePnl = displayPrice !== null
-    ? positions.reduce((sum, position) => sum + calculateLivePositionMetrics(position, displayPrice).unrealizedPnl, 0)
+  const change = latest && firstVisible ? ((latest.close - firstVisible.open) / firstVisible.open) * 100 : null;
+  const liveMetrics = latest && primaryPosition ? calculateLivePositionMetrics(primaryPosition, latest.close) : null;
+  const aggregatePnl = latest
+    ? positions.reduce((sum, position) => sum + calculateLivePositionMetrics(position, latest.close).unrealizedPnl, 0)
     : null;
 
   return (
@@ -418,7 +410,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
         <div>
           <span className="section-kicker">BTCUSDT · PERPETUAL · TRADINGVIEW</span>
           <div className="live-chart-price-row">
-            <h2>{displayPrice !== null ? `$${displayPrice.toLocaleString("en-US", { maximumFractionDigits: 1 })}` : "BTC 실시간 차트"}</h2>
+            <h2>{latest ? `$${latest.close.toLocaleString("en-US", { maximumFractionDigits: 1 })}` : "BTC 실시간 차트"}</h2>
             {change != null ? <strong className={change >= 0 ? "paper-positive" : "paper-negative"}>{change >= 0 ? "+" : ""}{change.toFixed(2)}%</strong> : null}
             <span className={`chart-live-state ${status}`}>{status === "live" ? "● LIVE" : status === "loading" ? "불러오는 중" : status === "reconnecting" ? "재연결 중" : "연결 오류"}</span>
           </div>
@@ -440,7 +432,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
         <small>{loadingOlder ? "과거 캔들 불러오는 중…" : "왼쪽으로 드래그하면 과거 캔들 자동 로딩 · 실제 모의매매 진입만 표시"}</small>
       </div>
 
-      {primaryPosition && displayPrice !== null && liveMetrics ? (
+      {primaryPosition && latest && liveMetrics ? (
         <div className={`live-position-strip ${primaryPosition.side}`}>
           <div className="live-position-main">
             <span className="live-position-dot" aria-hidden="true" />
@@ -455,7 +447,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
           </div>
           <div>
             <small>현재가</small>
-            <strong>${displayPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}</strong>
+            <strong>${latest.close.toLocaleString("en-US", { maximumFractionDigits: 2 })}</strong>
           </div>
           <div>
             <small>가격 수익률</small>
@@ -480,7 +472,7 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
 
       <div ref={containerRef} className="tradingview-chart-container" aria-label={`BTCUSDT ${interval} TradingView 실시간 캔들 차트`} />
       <div className="chart-footnote">
-        Binance USDⓈ-M Futures 실시간 가격 · Supabase 완료 캔들 · Charting technology by TradingView Lightweight Charts™ · LONG/SHORT 마커는 실제 모의매매 진입 시점만 표시됩니다.
+        Binance USDⓈ-M Futures 실시간 데이터 · Charting technology by TradingView Lightweight Charts™ · LONG/SHORT 마커는 실제 모의매매 진입 시점만 표시됩니다.
       </div>
     </section>
   );
