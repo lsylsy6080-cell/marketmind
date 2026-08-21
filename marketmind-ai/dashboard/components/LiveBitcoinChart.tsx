@@ -179,7 +179,6 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
 
   useEffect(() => {
     let disposed = false;
-    let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const chart = chartRef.current;
 
@@ -276,56 +275,58 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
 
     function connect() {
       if (disposed) return;
-      socket = new WebSocket(`wss://fstream.binance.com/market/ws/btcusdt@kline_${interval}`);
-      socket.onopen = () => { if (!disposed) setStatus("live"); };
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as KlinePayload;
-          if (!data.k) return;
-          const next: Candle = {
-            time: Math.floor(data.k.t / 1000),
-            open: Number(data.k.o),
-            high: Number(data.k.h),
-            low: Number(data.k.l),
-            close: Number(data.k.c),
-            volume: Number(data.k.v),
-          };
-          setCandles((current) => {
-            if (!current.length) {
-              const initial = [next];
-              candlesRef.current = initial;
-              candleSeriesRef.current?.update(toChartCandle(next));
-              return initial;
-            }
-            const copy = current.slice();
-            const last = copy[copy.length - 1];
-            if (last.time === next.time) copy[copy.length - 1] = next;
-            else if (next.time > last.time) copy.push(next);
-            else return current;
 
-            // Keep loaded history. Do not trim old candles when live ticks arrive.
-            candlesRef.current = copy;
-            candleSeriesRef.current?.update(toChartCandle(next));
-            const e20 = emaData(copy, 20);
-            const e60 = emaData(copy, 60);
-            const e120 = emaData(copy, 120);
+      // Browser -> Binance Futures WebSocket can be blocked by region/network policy.
+      // Keep the chart live through our own Next.js API, which already reads Supabase.
+      const pollLatest = async () => {
+        if (disposed) return;
+        try {
+          const response = await fetch(
+            `/api/market-chart?symbol=BTCUSDT&interval=${intervalRef.current}&limit=2`,
+            { cache: "no-store" },
+          );
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.error ?? "실시간 차트 데이터 오류");
+          if (disposed || intervalRef.current !== interval) return;
+
+          const incoming = (payload.candles as Candle[] | undefined) ?? [];
+          if (!incoming.length) {
+            setStatus("reconnecting");
+            return;
+          }
+
+          setCandles((current) => {
+            const mergedMap = new Map<number, Candle>();
+            for (const candle of current) mergedMap.set(candle.time, candle);
+            for (const candle of incoming) mergedMap.set(candle.time, candle);
+            const merged = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+
+            candlesRef.current = merged;
+            const latestCandle = merged[merged.length - 1];
+            if (latestCandle) candleSeriesRef.current?.update(toChartCandle(latestCandle));
+
+            const e20 = emaData(merged, 20);
+            const e60 = emaData(merged, 60);
+            const e120 = emaData(merged, 120);
             if (e20.length) ema20SeriesRef.current?.update(e20[e20.length - 1]);
             if (e60.length) ema60SeriesRef.current?.update(e60[e60.length - 1]);
             if (e120.length) ema120SeriesRef.current?.update(e120[e120.length - 1]);
-            return copy;
+            return merged;
           });
-        } catch {
-          // Ignore malformed stream messages and keep the chart connected.
+          setStatus("live");
+          setError(null);
+        } catch (e) {
+          if (!disposed) {
+            setStatus("reconnecting");
+            setError(e instanceof Error ? e.message : "실시간 차트를 갱신하지 못했습니다.");
+          }
         }
       };
-      socket.onerror = () => { if (!disposed) setStatus("reconnecting"); };
-      socket.onclose = () => {
-        if (!disposed) {
-          setStatus("reconnecting");
-          retryTimer = setTimeout(connect, 2500);
-        }
-      };
+
+      void pollLatest();
+      retryTimer = setInterval(pollLatest, 3000) as unknown as ReturnType<typeof setTimeout>;
     }
+
 
     chart?.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
     void loadHistory();
@@ -334,7 +335,6 @@ export function LiveBitcoinChart({ entries = [], positions = [] }: LiveBitcoinCh
       loadingOlderRef.current = false;
       if (retryTimer) clearTimeout(retryTimer);
       chart?.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
-      socket?.close();
     };
   }, [interval]);
 
