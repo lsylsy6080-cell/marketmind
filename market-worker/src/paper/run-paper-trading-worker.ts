@@ -18,11 +18,15 @@ import type {
   PositionExcursion,
   PositionSide,
   TradingPermission,
+  CloseReason,
 } from "./PaperTradingRules";
 
 const BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/price";
 const REQUEST_TIMEOUT_MS = 12_000;
 const DECISION_MAX_AGE_MINUTES = 30;
+const PASSIVE_RUN_LOG_INTERVAL_MINUTES = Number(
+  process.env.PAPER_PASSIVE_LOG_INTERVAL_MINUTES ?? 30,
+);
 
 interface PaperAccountRow {
   id: number;
@@ -83,6 +87,14 @@ interface RpcResult {
 
 interface PaperWorkerOptions {
   logPrefix?: string;
+}
+
+export interface PaperWorkerSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  actions: Record<StrategyAction, number>;
+  errors: string[];
 }
 
 type StrategyAction =
@@ -428,6 +440,33 @@ async function insertStrategyRun(params: {
   reason: string;
   marketPrice: number | null;
 }): Promise<void> {
+  // held/skipped는 매 실행마다 기록하면 최근 이력이 같은 내용으로 도배됩니다.
+  // 기본 30분에 한 번만 남기고, 진입/청산/실패는 항상 기록합니다.
+  if (
+    (params.actionTaken === "held" || params.actionTaken === "skipped") &&
+    Number.isFinite(PASSIVE_RUN_LOG_INTERVAL_MINUTES) &&
+    PASSIVE_RUN_LOG_INTERVAL_MINUTES > 0
+  ) {
+    const cutoff = new Date(
+      Date.now() - PASSIVE_RUN_LOG_INTERVAL_MINUTES * 60_000,
+    ).toISOString();
+    const { data: recent, error: recentError } = await supabase
+      .from("paper_strategy_runs")
+      .select("id")
+      .eq("account_id", params.accountId)
+      .eq("symbol", params.symbol)
+      .eq("action_taken", params.actionTaken)
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentError) {
+      throw new Error(`최근 전략 실행 기록 조회 실패: ${recentError.message}`);
+    }
+    if (recent) return;
+  }
+
   const { error } = await supabase.from("paper_strategy_runs").insert({
     account_id: params.accountId,
     symbol: params.symbol,
@@ -535,13 +574,26 @@ function buildCloseDiagnostic(params: {
   );
 }
 
+/**
+ * DB RPC v1은 기존 청산 사유(take_profit/stop_loss/max_holding/
+ * opposite_signal/manual)만 허용합니다. Phase 6-2B에서 추가된
+ * break_even/trailing_profit은 실행 계층에서는 manual로 전달하고,
+ * 실제 전략 사유는 paper_strategy_runs의 reason에 그대로 보존합니다.
+ */
+function toRpcCloseReason(reason: CloseReason): string {
+  if (reason === "break_even" || reason === "trailing_profit") {
+    return "manual";
+  }
+  return reason;
+}
+
 async function processOpenPosition(params: {
   row: StrategyConfigRow;
   config: PaperStrategyConfig;
   decisionRow: FinalDecisionRow | null;
   positionRow: OpenPositionRow;
   marketPrice: number;
-}): Promise<void> {
+}): Promise<StrategyAction> {
   const decision = mapDecision(params.decisionRow);
   const excursion = await trackPositionExcursion({
     positionRow: params.positionRow,
@@ -577,13 +629,14 @@ async function processOpenPosition(params: {
       reason: `청산 조건 미충족 · ${closeDiagnostic}`,
       marketPrice: params.marketPrice,
     });
-    return;
+    return "held";
   }
 
+  const rpcCloseReason = toRpcCloseReason(closeReason);
   const { data, error } = await supabase.rpc("paper_close_position_v1", {
     p_position_id: params.positionRow.id,
     p_market_price: params.marketPrice,
-    p_close_reason: closeReason,
+    p_close_reason: rpcCloseReason,
   });
 
   if (error) {
@@ -611,6 +664,8 @@ async function processOpenPosition(params: {
       : result.reason ?? "청산이 건너뛰어졌습니다.",
     marketPrice: params.marketPrice,
   });
+
+  return closed ? "closed" : "skipped";
 }
 
 async function processNewEntry(params: {
@@ -618,7 +673,7 @@ async function processNewEntry(params: {
   config: PaperStrategyConfig;
   decisionRow: FinalDecisionRow | null;
   marketPrice: number;
-}): Promise<void> {
+}): Promise<StrategyAction> {
   const eligibility = evaluateEntryEligibility(
     params.config,
     mapDecision(params.decisionRow),
@@ -634,7 +689,7 @@ async function processNewEntry(params: {
       reason: eligibility.reason,
       marketPrice: params.marketPrice,
     });
-    return;
+    return "skipped";
   }
 
   const { data, error } = await supabase.rpc("paper_open_position_v1", {
@@ -674,18 +729,23 @@ async function processNewEntry(params: {
       : result.reason ?? "진입이 건너뛰어졌습니다.",
     marketPrice: params.marketPrice,
   });
+
+  if (opened && side === "long") return "opened_long";
+  if (opened && side === "short") return "opened_short";
+  return "skipped";
 }
 
 async function processConfig(
   row: StrategyConfigRow,
   marketPrice: number,
   decisionRow: FinalDecisionRow | null,
-): Promise<void> {
+): Promise<StrategyAction> {
   const config = mapConfig(row);
   const openPosition = await getOpenPosition(row.account_id, config.symbol);
 
+  let action: StrategyAction;
   if (openPosition) {
-    await processOpenPosition({
+    action = await processOpenPosition({
       row,
       config,
       decisionRow,
@@ -693,7 +753,7 @@ async function processConfig(
       marketPrice,
     });
   } else {
-    await processNewEntry({
+    action = await processNewEntry({
       row,
       config,
       decisionRow,
@@ -712,17 +772,27 @@ async function processConfig(
     marketPrice,
     position: positionAfter,
   });
+
+  return action;
 }
 
 export async function runPaperTradingWorker(
   options: PaperWorkerOptions = {},
-): Promise<void> {
+): Promise<PaperWorkerSummary> {
   const logPrefix = options.logPrefix ?? "Paper Trading";
   const configs = await getActiveConfigs();
+  const actions: Record<StrategyAction, number> = {
+    opened_long: 0,
+    opened_short: 0,
+    closed: 0,
+    held: 0,
+    skipped: 0,
+    failed: 0,
+  };
+  const errors: string[] = [];
 
   if (configs.length === 0) {
-    console.log("활성 Paper Trading 전략이 없습니다.");
-    return;
+    return { total: 0, succeeded: 0, failed: 0, actions, errors };
   }
 
   const marketPriceCache = new Map<string, Promise<number>>();
@@ -730,12 +800,13 @@ export async function runPaperTradingWorker(
 
   for (const row of configs) {
     const symbol = row.symbol.trim().toUpperCase();
+    let marketPriceForError: number | null = null;
+    let decisionIdForError: number | null = null;
 
     try {
       if (!marketPriceCache.has(symbol)) {
         marketPriceCache.set(symbol, fetchBinancePrice(symbol));
       }
-
       if (!decisionCache.has(symbol)) {
         decisionCache.set(symbol, getLatestDecision(symbol));
       }
@@ -744,27 +815,43 @@ export async function runPaperTradingWorker(
         marketPriceCache.get(symbol) as Promise<number>,
         decisionCache.get(symbol) as Promise<FinalDecisionRow | null>,
       ]);
+      marketPriceForError = marketPrice;
+      decisionIdForError = latestDecision?.id ?? null;
 
-      console.log(`[${logPrefix}] config=${row.id} ${symbol} 전략 실행 시작`);
-      await processConfig(row, marketPrice, latestDecision);
-      console.log(`[${logPrefix}] config=${row.id} ${symbol} 전략 실행 완료`);
+      const action = await processConfig(row, marketPrice, latestDecision);
+      actions[action] += 1;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-
-      console.error(`[${logPrefix}] config=${row.id} ${symbol} 실행 실패:`, message);
+      actions.failed += 1;
+      errors.push(`config=${row.id} ${symbol}: ${message}`);
 
       try {
         await insertStrategyRun({
           accountId: row.account_id,
           symbol,
-          decisionId: null,
+          decisionId: decisionIdForError,
           actionTaken: "failed",
           reason: message,
-          marketPrice: null,
+          marketPrice: marketPriceForError,
         });
       } catch (loggingError) {
-        console.error("Paper Trading 실패 기록 저장도 실패했습니다.", loggingError);
+        const loggingMessage =
+          loggingError instanceof Error ? loggingError.message : String(loggingError);
+        errors.push(`config=${row.id} 실패 기록 저장: ${loggingMessage}`);
       }
     }
   }
+
+  const failed = actions.failed;
+  const succeeded = configs.length - failed;
+
+  // 정상 실행에서는 config별 시작/완료 로그를 남기지 않습니다.
+  // 오류가 있을 때만 한 번에 요약하여 PM2 로그 폭주를 막습니다.
+  if (errors.length > 0) {
+    console.error(
+      `[${logPrefix}] ${failed}/${configs.length}개 전략 실패 | ${errors.slice(0, 3).join(" | ")}`,
+    );
+  }
+
+  return { total: configs.length, succeeded, failed, actions, errors };
 }
