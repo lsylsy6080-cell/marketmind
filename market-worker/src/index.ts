@@ -71,6 +71,10 @@ async function main(): Promise<void> {
       trackingStarted = await tracker.start();
       if (!trackingStarted) {
         rootLog(`[${formatKst()}] ⏭️ SKIP | 이미 다른 market-worker 실행이 진행 중입니다.`);
+        // Persistent Runner에서는 lock busy를 정상 완료와 구분해 즉시 재실행 루프를 막습니다.
+        if (process.env.WORKER_PERSISTENT_RUNNER === "true") {
+          process.exitCode = 75;
+        }
         return;
       }
     } catch (trackingError) {
