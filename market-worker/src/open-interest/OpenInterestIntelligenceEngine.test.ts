@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { classifyOpenInterestFlow } from "./OpenInterestIntelligenceEngine";
+const long=classifyOpenInterestFlow({priceChange15mPercent:.8,oiChange15mPercent:1.2,priceChange1hPercent:1.4,oiChange1hPercent:2.1});
+assert.equal(long.flowState,"long_building"); assert.ok(long.entryAdjustment>0);
+console.log("[PASS] 가격↑ + OI↑ = 신규 LONG 구축");
+const cover=classifyOpenInterestFlow({priceChange15mPercent:.8,oiChange15mPercent:-1.1,priceChange1hPercent:1.3,oiChange1hPercent:-2});
+assert.equal(cover.flowState,"short_covering"); assert.ok(cover.overheatAdjustment>0); assert.ok(cover.entryAdjustment<0);
+console.log("[PASS] 가격↑ + OI↓ = SHORT covering / 추격 억제");
+const short=classifyOpenInterestFlow({priceChange15mPercent:-.7,oiChange15mPercent:1,priceChange1hPercent:-1.1,oiChange1hPercent:1.8});
+assert.equal(short.flowState,"short_building");
+console.log("[PASS] 가격↓ + OI↑ = 신규 SHORT 구축");

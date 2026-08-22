@@ -13,14 +13,17 @@ import { analyzePendingBtcNewsByRules } from "../src/news/analyze-news-rules";
 import { generateBtcNewsScore } from "../src/news/btc-news-score";
 import { enrichLatestBtcNewsScore } from "../src/news/btc-news-intelligence-v2";
 import { generateBtcFundingSnapshot } from "../src/funding/generate-btc-funding-snapshot";
+import { collectOpenInterestSnapshot } from "../src/open-interest/collect-open-interest";
 import { refreshSignalCalibrationIfStale } from "../src/calibration/refresh-signal-calibration";
 import { generateFinalMarketDecision } from "../src/final/generate-final-market-decision";
 import { runDecisionV2 } from "../src/decision-v2/run-decision-v2";
 import { runAdaptiveSizing } from "../src/position-sizing/run-adaptive-sizing";
 import { runPaperTradingWorker } from "../src/paper/run-paper-trading-worker";
+import { runAdaptivePaperTrading } from "../src/adaptive-paper/run-adaptive-paper-trading";
 import { runFinalMarketBacktests } from "../src/backtest/run-final-market-backtests";
 import { runPerformanceEngine } from "../src/performance/run-performance-engine";
 import { runPerformanceBattle } from "../src/performance-battle/run-performance-battle";
+import { runFixedVsAdaptiveBattle } from "../src/adaptive-battle/run-fixed-vs-adaptive-battle";
 import { WorkerExecutionTracker } from "../src/operations/WorkerExecutionTracker";
 
 const CYCLE_INTERVAL_MS = Math.max(
@@ -155,6 +158,7 @@ async function collectContinuous(initial: boolean): Promise<void> {
   const mtf = await safeTask("MTF 캔들 동기화", () =>
     collectBtcChartTimeframes(mtfLimit),
   );
+  await safeTask("Open Interest 수집/분석", () => collectOpenInterestSnapshot());
 
   if (oneMinute.ok && mtf.ok) {
     const mtfCount = Object.values(mtf.value).reduce(
@@ -217,7 +221,11 @@ async function runCoreAnalysisCycle(): Promise<void> {
     }
 
     await safeTask("Adaptive Sizing", () => runAdaptiveSizing());
-    await safeTask("Paper Trading", () => runPaperTradingWorker());
+    await safeTask("Fixed Paper Trading", () => runPaperTradingWorker());
+    const adaptivePaper = await safeTask("Adaptive Paper Trading", () => runAdaptivePaperTrading());
+    if (adaptivePaper.ok && adaptivePaper.value.action !== "skipped") {
+      log(`💰 Adaptive Paper ${adaptivePaper.value.action} · ${adaptivePaper.value.reason}`);
+    }
 
     if (trackingStarted) await tracker.finish();
 
@@ -239,6 +247,7 @@ async function runPerformanceCycle(): Promise<void> {
   await safeTask("Final Backtests", () => runFinalMarketBacktests());
   await safeTask("Performance Engine", () => runPerformanceEngine());
   await safeTask("V1/V2 Battle", () => runPerformanceBattle());
+  await safeTask("Fixed vs Adaptive Battle", () => runFixedVsAdaptiveBattle());
   lastPerformanceAt = Date.now();
 }
 

@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { calculateBattleMetrics,evaluateFixedVsAdaptiveBattle } from "./FixedVsAdaptiveBattleEngine";
+const mk=(pnls:number[])=>pnls.map((netPnl,i)=>({netPnl,returnPercent:netPnl/100,feeAmount:1,holdingSeconds:600,closedAt:new Date(2026,0,1,0,i).toISOString()}));
+const m=calculateBattleMetrics(mk([100,-50,120,-20]),10000);
+assert.equal(m.totalTrades,4); assert.ok((m.profitFactor??0)>1); assert.ok(m.maxDrawdownPercent>0);
+console.log("[PASS] PF/MDD/수익률 계산");
+const r=evaluateFixedVsAdaptiveBattle({startedAt:new Date().toISOString(),fixedTrades:mk(Array(30).fill(10)),adaptiveTrades:mk(Array(30).fill(15)),fixedInitialBalance:10000,adaptiveInitialBalance:10000,minimumTradesRequired:30});
+assert.equal(r.status,"comparable"); assert.equal(r.winner,"adaptive");
+console.log("[PASS] 충분한 forward 표본에서 Adaptive 우세 판정");
+const warm=evaluateFixedVsAdaptiveBattle({startedAt:new Date().toISOString(),fixedTrades:mk([10]),adaptiveTrades:mk([10]),fixedInitialBalance:10000,adaptiveInitialBalance:10000,minimumTradesRequired:30});
+assert.equal(warm.status,"warming_up");
+console.log("[PASS] 표본 부족 시 승자 확정 금지");

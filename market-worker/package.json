@@ -37,7 +37,14 @@
     "worker:lock:status": "tsx scripts/check-worker-lock.ts",
     "runner": "tsx scripts/run-multiloop-worker.ts",
     "runner:once": "tsx src/index.ts",
-    "runner:legacy": "tsx scripts/run-persistent-worker.ts"
+    "runner:legacy": "tsx scripts/run-persistent-worker.ts",
+    "adaptive:paper:test": "tsx src/adaptive-paper/AdaptiveExecutionEngine.test.ts",
+    "adaptive:paper:run": "tsx scripts/run-adaptive-paper-trading.ts",
+    "liquidation:test": "tsx src/adaptive-paper/AdaptiveExecutionEngine.test.ts",
+    "adaptive:battle:test": "tsx src/adaptive-battle/FixedVsAdaptiveBattleEngine.test.ts",
+    "adaptive:battle:run": "tsx scripts/run-fixed-vs-adaptive-battle.ts",
+    "oi:test": "tsx src/open-interest/OpenInterestIntelligenceEngine.test.ts",
+    "oi:run": "tsx scripts/run-open-interest.ts"
   },
   "keywords": [],
   "author": "",

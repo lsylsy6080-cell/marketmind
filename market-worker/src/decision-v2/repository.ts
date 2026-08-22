@@ -9,6 +9,7 @@ interface SourceBundle {
   technical: DecisionV2Component & { id: number };
   news: DecisionV2Component & { id: number };
   funding: DecisionV2Component & { id: number };
+  openInterest: import("./types").OpenInterestDecisionContext | null;
   regime: MarketRegimeResult & { sourceId: number };
   v1DecisionId: number | null;
 }
@@ -20,7 +21,7 @@ const asNumber = (value: unknown, field: string): number => {
 };
 
 export async function loadDecisionV2Sources(): Promise<SourceBundle> {
-  const [technicalResult, newsResult, fundingResult, regimeResult, v1Result, calibrationResult, previousPlanResult, candles15mResult, candles1hResult] = await Promise.all([
+  const [technicalResult, newsResult, fundingResult, regimeResult, v1Result, calibrationResult, previousPlanResult, candles15mResult, candles1hResult, openInterestResult] = await Promise.all([
     supabase.from("market_scores")
       .select("id,analyzed_at,total_score,confidence,direction,risk_level,trading_permission,score_details")
       .eq("symbol", "BTCUSDT").order("analyzed_at", { ascending: false }).limit(1).maybeSingle(),
@@ -41,7 +42,7 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
       .eq("strategy_version", "signal-calibration-v2.3a3").order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("ai_decision_v2_snapshots")
       .select("calculated_at,entry_plan,entry_trigger,strategy_version").eq("symbol", "BTCUSDT")
-      .in("strategy_version", ["decision-engine-v2.5-entry-timing", "decision-engine-v2.5.1-entry-trigger-validator"])
+      .in("strategy_version", ["decision-engine-v2.5-entry-timing", "decision-engine-v2.5.1-entry-trigger-validator", "decision-engine-v2.6-open-interest"])
       .not("entry_plan", "is", null).order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("market_candles")
       .select("open_time,high,low").eq("exchange","binance").eq("market_type","spot").eq("symbol","BTCUSDT")
@@ -49,6 +50,9 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
     supabase.from("market_candles")
       .select("open_time,high,low").eq("exchange","binance").eq("market_type","spot").eq("symbol","BTCUSDT")
       .eq("timeframe","1h").eq("is_closed",true).order("open_time",{ascending:false}).limit(20),
+    supabase.from("btc_open_interest_snapshots")
+      .select("id,fetched_at,flow_state,directional_bias,confidence,oi_change_5m_percent,oi_change_15m_percent,oi_change_1h_percent,price_change_5m_percent,price_change_15m_percent,price_change_1h_percent,entry_adjustment,overheat_adjustment,reversal_adjustment,reasons")
+      .eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
   ]);
 
   for (const [label, result] of [
@@ -92,11 +96,31 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
     observedAt: String(structureRows15[0]?.open_time ?? structureRows1h[0]?.open_time ?? "") || null,
   } : null;
 
+  const oi = openInterestResult.error ? null : (openInterestResult.data as any);
+  const openInterest = oi ? {
+    id: Number(oi.id),
+    observedAt: String(oi.fetched_at),
+    flowState: oi.flow_state,
+    directionalBias: oi.directional_bias,
+    confidence: asNumber(oi.confidence ?? 0, "oi.confidence"),
+    oiChange5mPercent: Number.isFinite(Number(oi.oi_change_5m_percent)) ? Number(oi.oi_change_5m_percent) : null,
+    oiChange15mPercent: Number.isFinite(Number(oi.oi_change_15m_percent)) ? Number(oi.oi_change_15m_percent) : null,
+    oiChange1hPercent: Number.isFinite(Number(oi.oi_change_1h_percent)) ? Number(oi.oi_change_1h_percent) : null,
+    priceChange5mPercent: Number.isFinite(Number(oi.price_change_5m_percent)) ? Number(oi.price_change_5m_percent) : null,
+    priceChange15mPercent: Number.isFinite(Number(oi.price_change_15m_percent)) ? Number(oi.price_change_15m_percent) : null,
+    priceChange1hPercent: Number.isFinite(Number(oi.price_change_1h_percent)) ? Number(oi.price_change_1h_percent) : null,
+    entryAdjustment: asNumber(oi.entry_adjustment ?? 0, "oi.entry_adjustment"),
+    overheatAdjustment: asNumber(oi.overheat_adjustment ?? 0, "oi.overheat_adjustment"),
+    reversalAdjustment: asNumber(oi.reversal_adjustment ?? 0, "oi.reversal_adjustment"),
+    reasons: Array.isArray(oi.reasons) ? oi.reasons.map(String) : [],
+  } as import("./types").OpenInterestDecisionContext : null;
+
   return {
     previousEntryPlan,
     previousEntryPlanCalculatedAt:
       previousTrigger?.referencePlanCalculatedAt ?? previousPlanRow?.calculated_at ?? null,
     marketStructure,
+    openInterest,
     technical: {
       id: Number(t.id), score: asNumber(t.total_score, "technical.score"),
       confidence: asNumber(t.confidence, "technical.confidence"), direction: t.direction,
@@ -166,6 +190,13 @@ export async function saveDecisionV2(result: DecisionV2Result, source: SourceBun
     funding_crowding_side: result.fundingCrowdingSide,
     funding_entry_penalty: result.fundingEntryPenalty,
     funding_crowding_status: result.fundingCrowdingStatus,
+    open_interest_snapshot_id: source.openInterest?.id ?? null,
+    open_interest_flow_state: result.openInterestFlowState,
+    open_interest_directional_bias: result.openInterestDirectionalBias,
+    open_interest_confidence: result.openInterestConfidence,
+    open_interest_entry_adjustment: result.openInterestEntryAdjustment,
+    open_interest_overheat_adjustment: result.openInterestOverheatAdjustment,
+    open_interest_reversal_adjustment: result.openInterestReversalAdjustment,
     weights: result.weights,
     component_contributions: result.componentContributions,
     decision_reasons: result.reasons,

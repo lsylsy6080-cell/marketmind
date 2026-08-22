@@ -37,6 +37,24 @@ export interface EntryMarketStructure {
   observedAt: string | null;
 }
 
+export interface OpenInterestDecisionContext {
+  id: number;
+  observedAt: string;
+  flowState: "long_building" | "short_building" | "short_covering" | "long_unwinding" | "neutral" | "insufficient_data";
+  directionalBias: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  oiChange5mPercent: number | null;
+  oiChange15mPercent: number | null;
+  oiChange1hPercent: number | null;
+  priceChange5mPercent: number | null;
+  priceChange15mPercent: number | null;
+  priceChange1hPercent: number | null;
+  entryAdjustment: number;
+  overheatAdjustment: number;
+  reversalAdjustment: number;
+  reasons: string[];
+}
+
 export interface EntryTriggerValidation {
   status: "WATCH" | "RE_EVALUATE" | "READY" | "INVALIDATED" | "UNAVAILABLE";
   zone: "before_first" | "first_zone" | "second_zone" | "invalidated" | "unavailable";
@@ -71,6 +89,7 @@ export interface DecisionV2Input {
   previousEntryPlan?: EntryTimingPlan | null;
   previousEntryPlanCalculatedAt?: string | null;
   marketStructure?: EntryMarketStructure | null;
+  openInterest?: OpenInterestDecisionContext | null;
   now?: Date;
 }
 
@@ -123,6 +142,12 @@ export interface DecisionV2Result {
   fundingCrowdingSide: "long_crowded" | "balanced" | "short_crowded" | "unavailable";
   fundingEntryPenalty: number;
   fundingCrowdingStatus: "active" | "inactive" | "distribution_saturated" | "insufficient_data" | "stale";
+  openInterestFlowState: OpenInterestDecisionContext["flowState"];
+  openInterestDirectionalBias: OpenInterestDecisionContext["directionalBias"];
+  openInterestConfidence: number;
+  openInterestEntryAdjustment: number;
+  openInterestOverheatAdjustment: number;
+  openInterestReversalAdjustment: number;
   weights: DecisionV2Weights;
   reasons: string[];
   invalidationConditions: string[];

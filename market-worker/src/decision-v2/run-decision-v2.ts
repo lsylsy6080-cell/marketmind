@@ -12,6 +12,7 @@ export async function runDecisionV2(options?: { dryRun?: boolean; now?: Date }):
     previousEntryPlan: source.previousEntryPlan,
     previousEntryPlanCalculatedAt: source.previousEntryPlanCalculatedAt,
     marketStructure: source.marketStructure,
+    openInterest: source.openInterest,
     now: options?.now,
   });
 
