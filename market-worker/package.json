@@ -35,8 +35,9 @@
     "sizing:run": "tsx scripts/run-adaptive-sizing.ts",
     "sizing:dry": "ADAPTIVE_SIZING_DRY_RUN=true tsx scripts/run-adaptive-sizing.ts",
     "worker:lock:status": "tsx scripts/check-worker-lock.ts",
-    "runner": "tsx scripts/run-persistent-worker.ts",
-    "runner:once": "tsx src/index.ts"
+    "runner": "tsx scripts/run-multiloop-worker.ts",
+    "runner:once": "tsx src/index.ts",
+    "runner:legacy": "tsx scripts/run-persistent-worker.ts"
   },
   "keywords": [],
   "author": "",
