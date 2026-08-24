@@ -1,3 +1,8 @@
+import { runSqueezeEarlyWarning } from "../src/squeeze-warning/run-squeeze-early-warning";
+import { runSqueezeProbability } from "../src/squeeze/run-squeeze-probability";
+import { runEstimatedLiquidationMap } from "../src/liquidation-map/run-estimated-liquidation-map";
+import { runPositionClusterMap } from "../src/position-cluster/run-position-cluster";
+import { collectGlobalFuturesSnapshot } from "../src/global-futures/GlobalFuturesCollector";
 import "dotenv/config";
 import { open, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -14,6 +19,7 @@ import { generateBtcNewsScore } from "../src/news/btc-news-score";
 import { enrichLatestBtcNewsScore } from "../src/news/btc-news-intelligence-v2";
 import { generateBtcFundingSnapshot } from "../src/funding/generate-btc-funding-snapshot";
 import { collectOpenInterestSnapshot } from "../src/open-interest/collect-open-interest";
+import { LiquidationStreamCollector } from "../src/liquidation/LiquidationStreamCollector";
 import { refreshSignalCalibrationIfStale } from "../src/calibration/refresh-signal-calibration";
 import { generateFinalMarketDecision } from "../src/final/generate-final-market-decision";
 import { runDecisionV2 } from "../src/decision-v2/run-decision-v2";
@@ -45,6 +51,8 @@ const CONTINUOUS_ONE_MINUTE_LIMIT = 10;
 const CONTINUOUS_MTF_LIMIT = 3;
 
 const RUNNER_LOCK_PATH = path.join(process.cwd(), ".market-worker-runner.lock");
+
+const liquidationStream = new LiquidationStreamCollector();
 
 let stopping = false;
 let cycleNumber = 0;
@@ -159,6 +167,11 @@ async function collectContinuous(initial: boolean): Promise<void> {
     collectBtcChartTimeframes(mtfLimit),
   );
   await safeTask("Open Interest 수집/분석", () => collectOpenInterestSnapshot());
+  await safeTask("Global Futures 5개 거래소 수집", () => collectGlobalFuturesSnapshot());
+  await safeTask("Position Cluster Map", () => runPositionClusterMap());
+  await safeTask("Estimated Liquidation Map", () => runEstimatedLiquidationMap());
+  await safeTask("Squeeze Probability", () => runSqueezeProbability());
+  await safeTask("Squeeze Early Warning", () => runSqueezeEarlyWarning());
 
   if (oneMinute.ok && mtf.ok) {
     const mtfCount = Object.values(mtf.value).reduce(
@@ -277,6 +290,8 @@ async function runPipelineCycle(initial = false): Promise<void> {
 
 async function main(): Promise<void> {
   await acquireLocalRunnerLock();
+  await liquidationStream.start();
+  log("Liquidation forceOrder stream 시작");
 
   log(
     `Multi-Loop Worker 시작 · pipeline=${CYCLE_INTERVAL_MS / 1000}s` +
@@ -304,6 +319,9 @@ async function main(): Promise<void> {
       }
     }
   } finally {
+    await liquidationStream.stop().catch((error) =>
+      console.error(`[${formatKst()}] ⚠ Liquidation stream 종료 실패 | ${errorText(error)}`)
+    );
     await releaseLocalRunnerLock();
     log("Multi-Loop Worker 종료");
   }

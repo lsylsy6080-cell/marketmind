@@ -37,6 +37,25 @@ export interface EntryMarketStructure {
   observedAt: string | null;
 }
 
+
+export interface LiquidationDecisionContext {
+  id: number;
+  observedAt: string;
+  state: "short_squeeze" | "long_flush" | "mixed_cascade" | "quiet" | "insufficient_data";
+  directionalBias: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  longLiquidationUsd: number;
+  shortLiquidationUsd: number;
+  totalLiquidationUsd: number;
+  burstMultiple: number | null;
+  dominanceRatio: number;
+  streamHealthy: boolean;
+  entryAdjustment: number;
+  overheatAdjustment: number;
+  reversalAdjustment: number;
+  reasons: string[];
+}
+
 export interface OpenInterestDecisionContext {
   id: number;
   observedAt: string;
@@ -90,6 +109,7 @@ export interface DecisionV2Input {
   previousEntryPlanCalculatedAt?: string | null;
   marketStructure?: EntryMarketStructure | null;
   openInterest?: OpenInterestDecisionContext | null;
+  liquidation?: LiquidationDecisionContext | null;
   now?: Date;
 }
 
@@ -148,6 +168,12 @@ export interface DecisionV2Result {
   openInterestEntryAdjustment: number;
   openInterestOverheatAdjustment: number;
   openInterestReversalAdjustment: number;
+  liquidationState: LiquidationDecisionContext["state"];
+  liquidationDirectionalBias: LiquidationDecisionContext["directionalBias"];
+  liquidationConfidence: number;
+  liquidationEntryAdjustment: number;
+  liquidationOverheatAdjustment: number;
+  liquidationReversalAdjustment: number;
   weights: DecisionV2Weights;
   reasons: string[];
   invalidationConditions: string[];

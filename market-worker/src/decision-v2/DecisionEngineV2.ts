@@ -771,6 +771,73 @@ function evaluateOpenInterest(
   };
 }
 
+
+type LiquidationEvaluation = {
+  status: "active" | "inactive" | "stale" | "insufficient_data";
+  state: import("./types").LiquidationDecisionContext["state"];
+  directionalBias: import("./types").LiquidationDecisionContext["directionalBias"];
+  confidence: number;
+  entryAdjustment: number;
+  overheatAdjustment: number;
+  reversalAdjustment: number;
+  reason: string;
+};
+
+function evaluateLiquidation(
+  input: DecisionV2Input,
+  direction: V2Direction,
+  now: Date,
+): LiquidationEvaluation {
+  const liq = input.liquidation;
+  if (!liq) {
+    return {
+      status: "inactive", state: "insufficient_data", directionalBias: "neutral",
+      confidence: 0, entryAdjustment: 0, overheatAdjustment: 0, reversalAdjustment: 0,
+      reason: "Liquidation snapshot이 없어 Decision 보정을 적용하지 않았습니다.",
+    };
+  }
+
+  const ageMinutes = (now.getTime() - new Date(liq.observedAt).getTime()) / 60_000;
+  if (!Number.isFinite(ageMinutes) || ageMinutes > 5) {
+    return {
+      status: "stale", state: liq.state, directionalBias: liq.directionalBias,
+      confidence: liq.confidence, entryAdjustment: 0, overheatAdjustment: 0, reversalAdjustment: 0,
+      reason: `Liquidation snapshot이 ${round(ageMinutes, 1)}분 경과해 보정을 적용하지 않았습니다.`,
+    };
+  }
+
+  if (!liq.streamHealthy || liq.state === "insufficient_data" || liq.confidence < 30) {
+    return {
+      status: "insufficient_data", state: liq.state, directionalBias: liq.directionalBias,
+      confidence: liq.confidence, entryAdjustment: 0, overheatAdjustment: 0, reversalAdjustment: 0,
+      reason: "Liquidation 스트림/표본 신뢰도가 부족해 보정을 적용하지 않았습니다.",
+    };
+  }
+
+  let entryAdjustment = liq.entryAdjustment;
+  if (
+    direction !== "neutral" &&
+    liq.directionalBias !== "neutral" &&
+    direction !== liq.directionalBias
+  ) {
+    entryAdjustment = -Math.max(4, Math.abs(liq.entryAdjustment));
+  }
+
+  const scale = clamp(liq.confidence, 30, 100) / 100;
+  return {
+    status: "active",
+    state: liq.state,
+    directionalBias: liq.directionalBias,
+    confidence: liq.confidence,
+    entryAdjustment: round(entryAdjustment * scale, 2),
+    overheatAdjustment: round(Math.max(0, liq.overheatAdjustment) * scale, 2),
+    reversalAdjustment: round(Math.max(0, liq.reversalAdjustment) * scale, 2),
+    reason:
+      `Liquidation ${liq.state} · bias=${liq.directionalBias} · confidence=${round(liq.confidence)} · ` +
+      `long=$${Math.round(liq.longLiquidationUsd).toLocaleString()} · short=$${Math.round(liq.shortLiquidationUsd).toLocaleString()}`,
+  };
+}
+
 export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
   const now = input.now ?? new Date();
   const weights = getWeights(input.regime.regime);
@@ -797,8 +864,17 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
   const dataReliability = calculateDataReliability(input, now);
   const fundingCrowding = evaluateFundingCrowding(input, direction);
   const openInterest = evaluateOpenInterest(input, direction, now);
-  const overheatRisk = round(clamp(baseOverheatRisk + openInterest.overheatAdjustment));
-  const reversalRisk = round(clamp(baseReversalRisk + openInterest.reversalAdjustment));
+  const liquidation = evaluateLiquidation(input, direction, now);
+  const overheatRisk = round(clamp(
+    baseOverheatRisk +
+    openInterest.overheatAdjustment +
+    liquidation.overheatAdjustment
+  ));
+  const reversalRisk = round(clamp(
+    baseReversalRisk +
+    openInterest.reversalAdjustment +
+    liquidation.reversalAdjustment
+  ));
 
   const weightedConfidence =
     normalizeScore(input.technical.confidence) * weights.technical +
@@ -824,7 +900,8 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
       reversalRisk * 0.22 -
       riskPenalty -
       fundingCrowding.entryPenalty +
-      openInterest.entryAdjustment,
+      openInterest.entryAdjustment +
+      liquidation.entryAdjustment,
   ));
   const entryQuality = determineEntryQuality(entryQualityScore);
   const riskLevel = determineRisk(input, reversalRisk, dataReliability);
@@ -874,6 +951,7 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
   reasons.push("Funding은 Phase 7-3C부터 방향점수 직접 기여를 중단하고 crowding risk로만 진입 품질을 보정합니다.");
   reasons.push(fundingCrowding.reason);
   reasons.push(openInterest.reason);
+  reasons.push(liquidation.reason);
 
   if (overheatRisk >= 50) reasons.push("상위 시간봉 과열/급등락 때문에 추격 진입을 억제하고 눌림목 대기를 우선했습니다.");
   if (input.regime.highVolatilityWeight >= 35) reasons.push("고변동 시간봉 비중이 높아 신규 진입 위험을 가중했습니다.");
@@ -915,6 +993,12 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
     openInterestEntryAdjustment: openInterest.entryAdjustment,
     openInterestOverheatAdjustment: openInterest.overheatAdjustment,
     openInterestReversalAdjustment: openInterest.reversalAdjustment,
+    liquidationState: liquidation.state,
+    liquidationDirectionalBias: liquidation.directionalBias,
+    liquidationConfidence: liquidation.confidence,
+    liquidationEntryAdjustment: liquidation.entryAdjustment,
+    liquidationOverheatAdjustment: liquidation.overheatAdjustment,
+    liquidationReversalAdjustment: liquidation.reversalAdjustment,
     weights,
     reasons,
     invalidationConditions: buildInvalidationConditions(input, direction),
@@ -924,6 +1008,6 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
       funding: round(contributions.funding),
       regime: round(contributions.regime),
     },
-    strategyVersion: "decision-engine-v2.6-open-interest",
+    strategyVersion: "decision-engine-v2.7-liquidation",
   };
 }

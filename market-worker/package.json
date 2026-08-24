@@ -40,11 +40,23 @@
     "runner:legacy": "tsx scripts/run-persistent-worker.ts",
     "adaptive:paper:test": "tsx src/adaptive-paper/AdaptiveExecutionEngine.test.ts",
     "adaptive:paper:run": "tsx scripts/run-adaptive-paper-trading.ts",
-    "liquidation:test": "tsx src/adaptive-paper/AdaptiveExecutionEngine.test.ts",
+    "liquidation:test": "tsx src/liquidation/LiquidationIntelligenceEngine.test.ts",
     "adaptive:battle:test": "tsx src/adaptive-battle/FixedVsAdaptiveBattleEngine.test.ts",
     "adaptive:battle:run": "tsx scripts/run-fixed-vs-adaptive-battle.ts",
     "oi:test": "tsx src/open-interest/OpenInterestIntelligenceEngine.test.ts",
-    "oi:run": "tsx scripts/run-open-interest.ts"
+    "oi:run": "tsx scripts/run-open-interest.ts",
+    "liquidation:run": "tsx scripts/run-liquidation-stream.ts",
+    "liquidation:status": "tsx scripts/check-liquidation-status.ts",
+    "global:futures:run": "tsx scripts/run-global-futures.ts",
+    "global:futures:test": "tsx src/global-futures/GlobalFuturesNormalization.test.ts",
+    "position:cluster:test": "tsx src/position-cluster/PositionClusterEngine.test.ts",
+    "position:cluster:run": "tsx scripts/run-position-cluster.ts",
+    "liquidation:map:test": "tsx src/liquidation-map/EstimatedLiquidationMapEngine.test.ts",
+    "liquidation:map:run": "tsx scripts/run-estimated-liquidation-map.ts",
+    "squeeze:test": "tsx src/squeeze/SqueezeProbabilityEngine.test.ts",
+    "squeeze:run": "tsx scripts/run-squeeze-probability.ts",
+    "squeeze:warning:test": "tsx src/squeeze-warning/SqueezeEarlyWarningEngine.test.ts",
+    "squeeze:warning:run": "tsx scripts/run-squeeze-early-warning.ts"
   },
   "keywords": [],
   "author": "",
@@ -55,11 +67,13 @@
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "openai": "^6.49.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.23.1",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@types/ws": "^8.18.1"
   }
 }
