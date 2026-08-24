@@ -58,7 +58,9 @@
     "squeeze:warning:test": "tsx src/squeeze-warning/SqueezeEarlyWarningEngine.test.ts",
     "squeeze:warning:run": "tsx scripts/run-squeeze-early-warning.ts",
     "phase7:audit:test": "tsx src/phase7-audit/Phase7PipelineAudit.test.ts",
-    "phase7:audit:run": "tsx scripts/run-phase7-pipeline-audit.ts"
+    "phase7:audit:run": "tsx scripts/run-phase7-pipeline-audit.ts",
+    "squeeze:opportunity:test": "tsx src/squeeze-opportunity/SqueezeOpportunityEngine.test.ts",
+    "squeeze:opportunity:run": "tsx scripts/run-squeeze-opportunity.ts"
   },
   "keywords": [],
   "author": "",

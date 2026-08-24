@@ -1,3 +1,4 @@
+import { runSqueezeOpportunity } from "../src/squeeze-opportunity/run-squeeze-opportunity";
 import { runPhase7PipelineAudit } from "../src/phase7-audit/run-phase7-pipeline-audit";
 import { runSqueezeEarlyWarning } from "../src/squeeze-warning/run-squeeze-early-warning";
 import { runSqueezeProbability } from "../src/squeeze/run-squeeze-probability";
@@ -173,6 +174,11 @@ async function collectContinuous(initial: boolean): Promise<void> {
   await safeTask("Estimated Liquidation Map", () => runEstimatedLiquidationMap());
   await safeTask("Squeeze Probability", () => runSqueezeProbability());
   await safeTask("Squeeze Early Warning", () => runSqueezeEarlyWarning());
+  const squeezeOpportunity = await safeTask("Squeeze Opportunity", () => runSqueezeOpportunity());
+  if (squeezeOpportunity.ok && squeezeOpportunity.value.status === "ok" && squeezeOpportunity.value.result?.permission === "paper_candidate") {
+    const o=squeezeOpportunity.value.result;
+    log(`⚡ Squeeze Opportunity ${o.preferredDirection.toUpperCase()} · LONG=${o.longOpportunity.status}/${o.longOpportunity.score.toFixed(0)} · SHORT=${o.shortOpportunity.status}/${o.shortOpportunity.score.toFixed(0)}`);
+  }
 
   if (oneMinute.ok && mtf.ok) {
     const mtfCount = Object.values(mtf.value).reduce(
