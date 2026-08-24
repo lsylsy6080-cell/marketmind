@@ -31,5 +31,5 @@ export interface GlobalFuturesSnapshot{
   takerSourceCount:number;
   takerSourceCoveragePercent:number;
   exchanges:ExchangeFuturesSnapshot[];
-  strategyVersion:"global-futures-intelligence-v7.11.1";
+  strategyVersion:"global-futures-intelligence-v7.11.2-taker5";
 }

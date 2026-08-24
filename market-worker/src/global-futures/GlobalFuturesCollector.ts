@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { supabase } from "../lib/supabase";
 import type { ExchangeFuturesSnapshot,FuturesExchange,GlobalFuturesSnapshot } from "./types";
+import {normalizeBinanceTrades,normalizeBybitTrades,normalizeGateTrades,normalizeMexcTrades,normalizeOkxTrades} from "./TakerFlowNormalizer";
 
 const num=(v:unknown):number|null=>{const n=Number(v);return Number.isFinite(n)?n:null};
 const safeUsd=(a:number|null,b:number|null)=>a!=null&&b!=null?a*b:null;
@@ -21,11 +22,12 @@ async function binance():Promise<ExchangeFuturesSnapshot>{
       json("https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=BTCUSDT"),
       json("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT"),
       json("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"),
-      json("https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=BTCUSDT&period=5m&limit=1").catch(()=>[]),
+      json("https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&limit=500").catch(()=>[]),
     ]);
     const price=num(ticker.lastPrice),base=num(ticker.volume),turnover=num(ticker.quoteVolume);
-    const oiBase=num(oi.openInterest),buyVol=num(taker?.[0]?.buyVol),sellVol=num(taker?.[0]?.sellVol);
-    const buyUsd=safeUsd(buyVol,price),sellUsd=safeUsd(sellVol,price);
+    const oiBase=num(oi.openInterest);
+    const flow=normalizeBinanceTrades(Array.isArray(taker)?taker:[]);
+    const buyUsd=flow.sampleCount>0?flow.buyUsd:null,sellUsd=flow.sampleCount>0?flow.sellUsd:null;
     return {exchange:"binance",symbol:"BTCUSDT",fetchedAt:new Date().toISOString(),lastPrice:price,
       markPrice:num(premium.markPrice),volume24hBase:base,turnover24hUsd:turnover,
       openInterestBase:oiBase,openInterestUsd:safeUsd(oiBase,price),fundingRate:num(premium.lastFundingRate),
@@ -36,37 +38,43 @@ async function binance():Promise<ExchangeFuturesSnapshot>{
 
 async function bybit():Promise<ExchangeFuturesSnapshot>{
   try{
-    const x=await json("https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT");
+    const [x,trades]=await Promise.all([json("https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT"),json("https://api.bybit.com/v5/market/recent-trade?category=linear&symbol=BTCUSDT&limit=500").catch(()=>null)]);
     const t=x?.result?.list?.[0]; if(!t)throw new Error("empty ticker");
+    const flow=normalizeBybitTrades(Array.isArray(trades?.result?.list)?trades.result.list:[]);
     const price=num(t.lastPrice),oiBase=num(t.openInterest);
     return {exchange:"bybit",symbol:"BTCUSDT",fetchedAt:new Date().toISOString(),lastPrice:price,markPrice:num(t.markPrice),
       volume24hBase:num(t.volume24h),turnover24hUsd:num(t.turnover24h),openInterestBase:oiBase,
       openInterestUsd:num(t.openInterestValue)??safeUsd(oiBase,price),fundingRate:num(t.fundingRate),
-      takerBuyUsd:null,takerSellUsd:null,takerBuyRatio:null,available:true,error:null};
+      takerBuyUsd:flow.sampleCount>0?flow.buyUsd:null,takerSellUsd:flow.sampleCount>0?flow.sellUsd:null,takerBuyRatio:flow.buyRatio,available:true,error:null};
   }catch(e){return fail("bybit","BTCUSDT",e)}
 }
 
 async function okx():Promise<ExchangeFuturesSnapshot>{
   try{
-    const [tick,oi,funding]=await Promise.all([
+    const [tick,oi,funding,instrument,trades]=await Promise.all([
       json("https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT-SWAP"),
       json("https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=BTC-USDT-SWAP"),
       json("https://www.okx.com/api/v5/public/funding-rate?instId=BTC-USDT-SWAP"),
+      json("https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=BTC-USDT-SWAP"),
+      json("https://www.okx.com/api/v5/market/trades?instId=BTC-USDT-SWAP&limit=500").catch(()=>null),
     ]);
     const t=tick?.data?.[0],o=oi?.data?.[0],f=funding?.data?.[0]; if(!t)throw new Error("empty ticker");
     const price=num(t.last),oiBase=num(o?.oiCcy)??num(o?.oi);
+    const ctVal=num(instrument?.data?.[0]?.ctVal);
+    const flow=ctVal!=null&&ctVal>0?normalizeOkxTrades(Array.isArray(trades?.data)?trades.data:[],ctVal):{buyUsd:0,sellUsd:0,buyRatio:null,sampleCount:0};
     return {exchange:"okx",symbol:"BTC-USDT-SWAP",fetchedAt:new Date().toISOString(),lastPrice:price,markPrice:null,
       volume24hBase:num(t.volCcy24h),turnover24hUsd:safeUsd(num(t.volCcy24h),price),openInterestBase:oiBase,
       openInterestUsd:num(o?.oiUsd)??safeUsd(oiBase,price),fundingRate:num(f?.fundingRate),
-      takerBuyUsd:null,takerSellUsd:null,takerBuyRatio:null,available:true,error:null};
+      takerBuyUsd:flow.sampleCount>0?flow.buyUsd:null,takerSellUsd:flow.sampleCount>0?flow.sellUsd:null,takerBuyRatio:flow.buyRatio,available:true,error:null};
   }catch(e){return fail("okx","BTC-USDT-SWAP",e)}
 }
 
 async function gate():Promise<ExchangeFuturesSnapshot>{
   try{
-    const [arr,contract]=await Promise.all([
+    const [arr,contract,trades]=await Promise.all([
       json("https://api.gateio.ws/api/v4/futures/usdt/tickers?contract=BTC_USDT"),
       json("https://api.gateio.ws/api/v4/futures/usdt/contracts/BTC_USDT"),
+      json("https://api.gateio.ws/api/v4/futures/usdt/trades?contract=BTC_USDT&limit=500").catch(()=>[]),
     ]);
     const t=Array.isArray(arr)?arr[0]:arr; if(!t)throw new Error("empty ticker");
     const price=num(t.last),base=num(t.volume_24h_base),turnover=num(t.volume_24h_quote);
@@ -74,18 +82,20 @@ async function gate():Promise<ExchangeFuturesSnapshot>{
     const multiplier=num(contract?.quanto_multiplier);
     if(multiplier==null||multiplier<=0)throw new Error("invalid Gate quanto_multiplier");
     const oiBase=contractCount==null?null:contractCount*multiplier;
+    const flow=normalizeGateTrades(Array.isArray(trades)?trades:[],multiplier);
     return {exchange:"gate",symbol:"BTC_USDT",fetchedAt:new Date().toISOString(),lastPrice:price,markPrice:num(t.mark_price),
       volume24hBase:base,turnover24hUsd:turnover??safeUsd(base,price),openInterestBase:oiBase,
       openInterestUsd:safeUsd(oiBase,price),fundingRate:num(t.funding_rate),
-      takerBuyUsd:null,takerSellUsd:null,takerBuyRatio:null,available:true,error:null};
+      takerBuyUsd:flow.sampleCount>0?flow.buyUsd:null,takerSellUsd:flow.sampleCount>0?flow.sellUsd:null,takerBuyRatio:flow.buyRatio,available:true,error:null};
   }catch(e){return fail("gate","BTC_USDT",e)}
 }
 
 async function mexc():Promise<ExchangeFuturesSnapshot>{
   try{
-    const [x,detail]=await Promise.all([
+    const [x,detail,deals]=await Promise.all([
       json("https://contract.mexc.com/api/v1/contract/ticker?symbol=BTC_USDT"),
       json("https://contract.mexc.com/api/v1/contract/detail"),
+      json("https://contract.mexc.com/api/v1/contract/deals/BTC_USDT").catch(()=>null),
     ]);
     const t=x?.data; if(!t)throw new Error("empty ticker");
     const contracts=Array.isArray(detail?.data)?detail.data:[];
@@ -99,11 +109,12 @@ async function mexc():Promise<ExchangeFuturesSnapshot>{
     const base=volumeContracts==null?null:volumeContracts*contractSize;
     const oiBase=holdContracts==null?null:holdContracts*contractSize;
     const turnover=num(t.amount24);
+    const flow=normalizeMexcTrades(Array.isArray(deals?.data)?deals.data:[],contractSize);
 
     return {exchange:"mexc",symbol:"BTC_USDT",fetchedAt:new Date().toISOString(),lastPrice:price,markPrice:num(t.fairPrice),
       volume24hBase:base,turnover24hUsd:turnover??safeUsd(base,price),openInterestBase:oiBase,
       openInterestUsd:safeUsd(oiBase,price),fundingRate:num(t.fundingRate),
-      takerBuyUsd:null,takerSellUsd:null,takerBuyRatio:null,available:true,error:null};
+      takerBuyUsd:flow.sampleCount>0?flow.buyUsd:null,takerSellUsd:flow.sampleCount>0?flow.sellUsd:null,takerBuyRatio:flow.buyRatio,available:true,error:null};
   }catch(e){return fail("mexc","BTC_USDT",e)}
 }
 
@@ -124,7 +135,7 @@ export async function collectGlobalFuturesSnapshot():Promise<GlobalFuturesSnapsh
     globalTakerBuyRatio:takerTotal>0?buys/takerTotal:null,globalTakerSellRatio:takerTotal>0?sells/takerTotal:null,
     takerSourceCount:takerRows.length,
     takerSourceCoveragePercent:healthy.length>0?takerRows.length/healthy.length*100:0,
-    exchanges,strategyVersion:"global-futures-intelligence-v7.11.1"
+    exchanges,strategyVersion:"global-futures-intelligence-v7.11.2-taker5"
   };
   const bucket=new Date(Math.floor(Date.now()/60_000)*60_000).toISOString();
   for(const x of exchanges){

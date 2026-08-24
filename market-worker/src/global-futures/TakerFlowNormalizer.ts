@@ -1,0 +1,8 @@
+export type TakerFlow={buyUsd:number;sellUsd:number;buyRatio:number|null;sampleCount:number};
+const num=(v:unknown):number|null=>{const n=Number(v);return Number.isFinite(n)?n:null};
+function out(b:number,s:number,c:number):TakerFlow{const t=b+s;return{buyUsd:b,sellUsd:s,buyRatio:t>0?b/t:null,sampleCount:c}}
+export function normalizeBinanceTrades(rows:any[]):TakerFlow{let b=0,s=0,c=0;for(const r of rows??[]){const p=num(r?.p),q=num(r?.q);if(p==null||q==null||p<=0||q<=0)continue;const u=p*q;if(r?.m===true)s+=u;else b+=u;c++}return out(b,s,c)}
+export function normalizeOkxTrades(rows:any[],ctVal:number):TakerFlow{let b=0,s=0,c=0;for(const r of rows??[]){const p=num(r?.px),q=num(r?.sz);if(p==null||q==null||p<=0||q<=0)continue;const u=p*q*ctVal,side=String(r?.side??'').toLowerCase();if(side==='buy')b+=u;else if(side==='sell')s+=u;else continue;c++}return out(b,s,c)}
+export function normalizeBybitTrades(rows:any[]):TakerFlow{let b=0,s=0,c=0;for(const r of rows??[]){const p=num(r?.price),q=num(r?.size);if(p==null||q==null||p<=0||q<=0)continue;const u=p*q,side=String(r?.side??'').toLowerCase();if(side==='buy')b+=u;else if(side==='sell')s+=u;else continue;c++}return out(b,s,c)}
+export function normalizeGateTrades(rows:any[],m:number):TakerFlow{let b=0,s=0,c=0;for(const r of rows??[]){const p=num(r?.price),q=num(r?.size);if(p==null||q==null||p<=0||q===0)continue;const u=p*Math.abs(q)*m;if(q>0)b+=u;else s+=u;c++}return out(b,s,c)}
+export function normalizeMexcTrades(rows:any[],cs:number):TakerFlow{let b=0,s=0,c=0;for(const r of rows??[]){const p=num(r?.p??r?.price),q=num(r?.v??r?.vol??r?.volume);if(p==null||q==null||p<=0||q<=0)continue;const u=p*q*cs,side=Number(r?.T??r?.side);if(side===1)b+=u;else if(side===2)s+=u;else continue;c++}return out(b,s,c)}
