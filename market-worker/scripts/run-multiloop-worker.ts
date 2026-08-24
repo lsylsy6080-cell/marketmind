@@ -1,3 +1,4 @@
+import { runPhase7PipelineAudit } from "../src/phase7-audit/run-phase7-pipeline-audit";
 import { runSqueezeEarlyWarning } from "../src/squeeze-warning/run-squeeze-early-warning";
 import { runSqueezeProbability } from "../src/squeeze/run-squeeze-probability";
 import { runEstimatedLiquidationMap } from "../src/liquidation-map/run-estimated-liquidation-map";
@@ -230,6 +231,15 @@ async function runCoreAnalysisCycle(): Promise<void> {
           ` · entry=${d.entryQualityScore.toFixed(0)}` +
           ` · heat=${d.overheatRisk.toFixed(0)}` +
           ` · trigger=${d.entryTrigger.status}`,
+      );
+    }
+
+    const phase7Audit = await safeTask("Phase 7 Pipeline Audit", () => runPhase7PipelineAudit());
+    if (phase7Audit.ok && phase7Audit.value.status !== "healthy") {
+      log(
+        `🛡 Phase 7 Audit ${phase7Audit.value.status.toUpperCase()}` +
+          ` · warning=${phase7Audit.value.warningStages}` +
+          ` · critical=${phase7Audit.value.criticalStages}`,
       );
     }
 

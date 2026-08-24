@@ -1,6 +1,15 @@
 import { supabase } from "../lib/supabase";
-import { buildAdaptiveExecutionPlan, determineAdaptiveCloseReason } from "./AdaptiveExecutionEngine";
-import type { AdaptivePaperSummary } from "./types";
+import {
+  buildAdaptiveExecutionPlan,
+  determineAdaptiveCloseReason,
+  evaluateAdaptiveSqueezeEntryGuard,
+  evaluateAdaptiveSqueezeProtection,
+} from "./AdaptiveExecutionEngine";
+import type {
+  AdaptivePaperCloseReason,
+  AdaptivePaperSummary,
+  AdaptiveSqueezeWarning,
+} from "./types";
 
 const BINANCE_TICKER_URL="https://api.binance.com/api/v3/ticker/price";
 const FEE_RATE_PERCENT=Number(process.env.ADAPTIVE_PAPER_FEE_RATE_PERCENT ?? 0.04);
@@ -14,6 +23,12 @@ const round=(v:number,d=8)=>{const m=10**d;return Math.round(v*m)/m};
 type V2Row={
   id:number; direction:"bullish"|"neutral"|"bearish"; calculated_at:string;
   entry_plan:any; entry_trigger:any; strategy_version:string;
+  trading_permission:string|null;
+  squeeze_warning_snapshot_id:number|null;
+  squeeze_warning_status:string|null;
+  squeeze_long_phase:string|null;
+  squeeze_short_phase:string|null;
+  squeeze_permission_override:string|null;
 };
 type SizingRow={
   id:number; decision_v2_id:number; sizing_status:string; margin_percent:number|string;
@@ -71,10 +86,40 @@ async function ensureAccount(baseAccountId:number):Promise<AdaptiveAccount>{
 
 async function getLatestV2():Promise<V2Row|null>{
   const {data,error}=await supabase.from("ai_decision_v2_snapshots")
-    .select("id,direction,calculated_at,entry_plan,entry_trigger,strategy_version")
+    .select("id,direction,calculated_at,entry_plan,entry_trigger,strategy_version,trading_permission,squeeze_warning_snapshot_id,squeeze_warning_status,squeeze_long_phase,squeeze_short_phase,squeeze_permission_override")
     .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle();
   if(error) throw new Error(`[Adaptive Paper] V2 조회 실패: ${error.message}`);
   return data as V2Row|null;
+}
+
+async function getSqueezeWarning(v2:V2Row|null):Promise<AdaptiveSqueezeWarning|null>{
+  const snapshotId=num(v2?.squeeze_warning_snapshot_id);
+  if(!v2 || snapshotId<=0 || v2.squeeze_warning_status!=="active") return null;
+
+  const {data,error}=await supabase.from("squeeze_early_warning_snapshots")
+    .select("id,calculated_at,long_phase,short_phase,long_alert_score,short_alert_score")
+    .eq("id",snapshotId).maybeSingle();
+  if(error) throw new Error(`[Adaptive Paper] squeeze warning 조회 실패: ${error.message}`);
+  if(!data) return null;
+
+  const ageMinutes=(Date.now()-new Date(String(data.calculated_at)).getTime())/60_000;
+  if(!Number.isFinite(ageMinutes) || ageMinutes>5) return null;
+
+  const validPhase=(v:unknown):AdaptiveSqueezeWarning["longPhase"]=>{
+    const value=String(v);
+    return ["WATCH","BUILDING","IMMINENT","ACTIVE","EXHAUSTION"].includes(value)
+      ? value as AdaptiveSqueezeWarning["longPhase"]
+      : "WATCH";
+  };
+
+  return {
+    snapshotId:Number(data.id),
+    observedAt:String(data.calculated_at),
+    longPhase:validPhase(data.long_phase),
+    shortPhase:validPhase(data.short_phase),
+    longAlertScore:num(data.long_alert_score),
+    shortAlertScore:num(data.short_alert_score),
+  };
 }
 
 async function getSizing(decisionV2Id:number):Promise<SizingRow|null>{
@@ -123,19 +168,60 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
   const account=await ensureAccount(config.account_id);
   const marketPrice=await fetchPrice("BTCUSDT");
   const v2=await getLatestV2();
+  const squeezeWarning=await getSqueezeWarning(v2);
   const open=await getOpenPosition(account.id);
 
   if(open){
-    const closeReason=determineAdaptiveCloseReason({
+    const baseCloseReason=determineAdaptiveCloseReason({
       side:open.side,marketPrice,entryPrice:num(open.entry_price),
       stopLossPrice:num(open.stop_loss_price),takeProfitPrice:num(open.take_profit_price),
       openedAt:open.opened_at,maxHoldingMinutes:num(config.max_holding_minutes,120),
       triggerStatus:v2?.entry_trigger?.status,currentDirection:v2?.direction,
     });
 
+    const squeezeProtection=evaluateAdaptiveSqueezeProtection({
+      side:open.side,
+      marketPrice,
+      entryPrice:num(open.entry_price),
+      currentStopLossPrice:num(open.stop_loss_price),
+      warning:squeezeWarning,
+    });
+
+    let closeReason:AdaptivePaperCloseReason|null=baseCloseReason;
+    if(!closeReason && squeezeProtection.action==="close"){
+      closeReason="squeeze_active";
+    }
+
+    if(!closeReason && squeezeProtection.action==="tighten_stop" && squeezeProtection.newStopLossPrice!=null){
+      const {error:protectError}=await supabase.from("adaptive_paper_positions").update({
+        stop_loss_price:squeezeProtection.newStopLossPrice,
+        squeeze_warning_snapshot_id:squeezeWarning?.snapshotId??null,
+        squeeze_phase:squeezeProtection.relevantPhase,
+        squeeze_alert_score:squeezeProtection.relevantAlertScore,
+        squeeze_protection_action:"tighten_stop",
+        squeeze_protective_stop_price:squeezeProtection.newStopLossPrice,
+        squeeze_protection_updated_at:new Date().toISOString(),
+      }).eq("id",open.id);
+      if(protectError) throw new Error(`[Adaptive Paper] squeeze protective stop 저장 실패: ${protectError.message}`);
+
+      const protectedPosition={...open,stop_loss_price:squeezeProtection.newStopLossPrice};
+      await saveEquitySnapshot(account,protectedPosition,marketPrice);
+      return {
+        action:"held",
+        positionId:open.id,
+        reason:squeezeProtection.reason,
+      };
+    }
+
     if(!closeReason){
       await saveEquitySnapshot(account,open,marketPrice);
-      return {action:"held",positionId:open.id,reason:"Adaptive position 청산 조건 미충족"};
+      return {
+        action:"held",
+        positionId:open.id,
+        reason:squeezeWarning
+          ? squeezeProtection.reason
+          : "Adaptive position 청산 조건 미충족",
+      };
     }
 
     const {data,error}=await supabase.rpc("adaptive_paper_close_position_v1",{
@@ -153,6 +239,11 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
         liquidation_safety_status:open.liquidation_safety_status,
         maintenance_margin_rate_percent:open.maintenance_margin_rate_percent,
         leverage_adjusted:open.leverage_adjusted ?? false,
+        squeeze_warning_snapshot_id:squeezeWarning?.snapshotId??null,
+        squeeze_exit_phase:squeezeProtection.relevantPhase,
+        squeeze_exit_alert_score:squeezeProtection.relevantAlertScore,
+        squeeze_protection_action:closeReason==="squeeze_active"?"close":"none",
+        squeeze_strategy_version:"adaptive-paper-squeeze-v7.17",
       }).eq("id",num(result.trade_id));
       if(tradeMetaError) throw new Error(`[Adaptive Paper] trade liquidation metadata 저장 실패: ${tradeMetaError.message}`);
     }
@@ -176,6 +267,20 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     return {action:"skipped",reason:`V2 direction=${v2.direction}`};
   }
 
+  if(v2.trading_permission==="blocked" || v2.squeeze_permission_override==="blocked"){
+    return {action:"skipped",reason:"Decision V2 squeeze/risk permission blocked"};
+  }
+
+  const entrySide=v2.direction==="bullish"?"long":"short";
+  const squeezeEntryGuard=evaluateAdaptiveSqueezeEntryGuard({
+    side:entrySide,
+    warning:squeezeWarning,
+  });
+  if(!squeezeEntryGuard.allowed){
+    await saveEquitySnapshot(account,null,marketPrice);
+    return {action:"skipped",reason:squeezeEntryGuard.reason};
+  }
+
   const sizing=await getSizing(v2.id);
   if(!sizing || sizing.sizing_status!=="candidate_ready" || num(sizing.margin_percent)<=0 || num(sizing.leverage)<=0){
     return {action:"skipped",reason:"READY 판단에 사용할 candidate sizing이 없습니다."};
@@ -192,9 +297,9 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
   const equityForSizing=num(freshAccount.data.cash_balance);
 
   const plan=buildAdaptiveExecutionPlan({
-    side:v2.direction==="bullish"?"long":"short",
+    side:entrySide,
     marketPrice,invalidationPrice,
-    marginPercent:num(sizing.margin_percent),
+    marginPercent:num(sizing.margin_percent)*squeezeEntryGuard.marginMultiplier,
     leverage:Math.trunc(num(sizing.leverage)),
     accountEquity:equityForSizing,
     feeRatePercent:FEE_RATE_PERCENT,targetRiskReward:TARGET_RR,
@@ -228,6 +333,11 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     maintenance_margin_rate_percent:plan.maintenanceMarginRatePercent,
     leverage_adjusted:plan.leverageAdjusted,
     liquidation_safety_reasons:plan.liquidationSafetyReasons,
+    squeeze_warning_snapshot_id:squeezeWarning?.snapshotId??null,
+    squeeze_phase:entrySide==="long"?(squeezeWarning?.longPhase??"WATCH"):(squeezeWarning?.shortPhase??"WATCH"),
+    squeeze_alert_score:entrySide==="long"?(squeezeWarning?.longAlertScore??0):(squeezeWarning?.shortAlertScore??0),
+    squeeze_protection_action:squeezeEntryGuard.marginMultiplier<1?"reduced_entry":"none",
+    squeeze_protection_updated_at:new Date().toISOString(),
   }).eq("id",num(result.position_id));
   if(liqMetaError) throw new Error(`[Adaptive Paper] liquidation metadata 저장 실패: ${liqMetaError.message}`);
 
@@ -241,6 +351,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     action:plan.side==="long"?"opened_long":"opened_short",
     positionId:num(result.position_id),plan,
     reason:`READY → ${plan.side.toUpperCase()} · margin ${plan.marginPercent}% · ${plan.leverage}x` +
+      `${squeezeEntryGuard.marginMultiplier<1 ? ` · squeeze margin x${squeezeEntryGuard.marginMultiplier}` : ""}` +
       `${plan.leverageAdjusted ? ` (요청 ${plan.requestedLeverage}x에서 안전조정)` : ""}` +
       ` · liq ${round(plan.estimatedLiquidationPrice,2)} · notional ${round(plan.notionalAmount,2)} USDT`,
   };

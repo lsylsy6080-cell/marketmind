@@ -4,6 +4,8 @@ import {
   determineAdaptiveCloseReason,
   estimateLiquidationPrice,
   evaluateLiquidationSafety,
+  evaluateAdaptiveSqueezeEntryGuard,
+  evaluateAdaptiveSqueezeProtection,
 } from "./AdaptiveExecutionEngine";
 
 const longPlan=buildAdaptiveExecutionPlan({
@@ -58,3 +60,69 @@ assert.equal(determineAdaptiveCloseReason({
   openedAt:new Date().toISOString(),maxHoldingMinutes:120,currentDirection:"bullish",triggerStatus:"INVALIDATED"
 }),"trigger_invalidated");
 console.log("[PASS] Entry Trigger INVALIDATED를 청산 조건으로 사용한다");
+
+
+const longActiveProtection=evaluateAdaptiveSqueezeProtection({
+  side:"long",
+  marketPrice:99000,
+  entryPrice:100000,
+  currentStopLossPrice:97000,
+  warning:{
+    snapshotId:1,observedAt:new Date().toISOString(),
+    longPhase:"ACTIVE",shortPhase:"WATCH",
+    longAlertScore:88,shortAlertScore:10,
+  },
+});
+assert.equal(longActiveProtection.action,"close");
+assert.equal(longActiveProtection.relevantPhase,"ACTIVE");
+console.log("[PASS] LONG 보유 중 Long Squeeze ACTIVE → 방어적 청산");
+
+const longImminentProtection=evaluateAdaptiveSqueezeProtection({
+  side:"long",
+  marketPrice:101000,
+  entryPrice:100000,
+  currentStopLossPrice:97000,
+  warning:{
+    snapshotId:2,observedAt:new Date().toISOString(),
+    longPhase:"IMMINENT",shortPhase:"WATCH",
+    longAlertScore:78,shortAlertScore:12,
+  },
+});
+assert.equal(longImminentProtection.action,"tighten_stop");
+assert.ok((longImminentProtection.newStopLossPrice??0)>97000);
+assert.ok((longImminentProtection.newStopLossPrice??Infinity)<101000);
+console.log("[PASS] Long Squeeze IMMINENT → 손절가를 시장가 쪽으로 강화");
+
+const adverseEntry=evaluateAdaptiveSqueezeEntryGuard({
+  side:"long",
+  warning:{
+    snapshotId:3,observedAt:new Date().toISOString(),
+    longPhase:"IMMINENT",shortPhase:"WATCH",
+    longAlertScore:80,shortAlertScore:10,
+  },
+});
+assert.equal(adverseEntry.allowed,false);
+console.log("[PASS] 신규 LONG에서 Long Squeeze IMMINENT → 진입 차단");
+
+const chaseEntry=evaluateAdaptiveSqueezeEntryGuard({
+  side:"long",
+  warning:{
+    snapshotId:4,observedAt:new Date().toISOString(),
+    longPhase:"WATCH",shortPhase:"ACTIVE",
+    longAlertScore:10,shortAlertScore:90,
+  },
+});
+assert.equal(chaseEntry.allowed,false);
+console.log("[PASS] Short Squeeze ACTIVE 중 신규 LONG 추격 → 진입 차단");
+
+const buildingEntry=evaluateAdaptiveSqueezeEntryGuard({
+  side:"short",
+  warning:{
+    snapshotId:5,observedAt:new Date().toISOString(),
+    longPhase:"WATCH",shortPhase:"BUILDING",
+    longAlertScore:10,shortAlertScore:65,
+  },
+});
+assert.equal(buildingEntry.allowed,true);
+assert.ok(buildingEntry.marginMultiplier<1);
+console.log("[PASS] Squeeze BUILDING → 진입 허용하되 margin 축소");

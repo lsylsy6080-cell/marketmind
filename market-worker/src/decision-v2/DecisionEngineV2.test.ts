@@ -262,6 +262,74 @@ const tests: Array<[string, () => void]> = [
     assert.equal(result.tradingPermission, "blocked");
     assert.equal(result.action, "wait");
   }],
+  ["bullish 판단에서 Long Squeeze ACTIVE는 신규 LONG을 차단한다", () => {
+    const input = baseInput(false);
+    input.squeezeWarning = {
+      id: 1,
+      observedAt: "2026-08-21T04:59:00.000Z",
+      longPhase: "ACTIVE",
+      shortPhase: "WATCH",
+      longAlertScore: 90,
+      shortAlertScore: 15,
+      dominantWarning: "long_squeeze",
+      longProbability: 88,
+      shortProbability: 18,
+      longRecommendedResponse: "defensive_exit",
+      shortRecommendedResponse: "observe",
+    };
+    const result = runDecisionEngineV2(input);
+    assert.equal(result.direction, "bullish");
+    assert.equal(result.squeezeLongPhase, "ACTIVE");
+    assert.ok(result.squeezeEntryPenalty > 0);
+    assert.equal(result.squeezePermissionOverride, "blocked");
+    assert.equal(result.tradingPermission, "blocked");
+    assert.equal(result.action, "wait");
+    assert.equal(result.entryTrigger.conditions.squeezeSafe, false);
+  }],
+  ["bullish 판단에서 Short Squeeze ACTIVE는 추격 LONG을 caution 처리한다", () => {
+    const input = baseInput(false);
+    input.squeezeWarning = {
+      id: 2,
+      observedAt: "2026-08-21T04:59:00.000Z",
+      longPhase: "WATCH",
+      shortPhase: "ACTIVE",
+      longAlertScore: 10,
+      shortAlertScore: 88,
+      dominantWarning: "short_squeeze",
+      longProbability: 12,
+      shortProbability: 86,
+      longRecommendedResponse: "observe",
+      shortRecommendedResponse: "defensive_exit",
+    };
+    const result = runDecisionEngineV2(input);
+    assert.equal(result.direction, "bullish");
+    assert.equal(result.squeezeShortPhase, "ACTIVE");
+    assert.ok(result.squeezeEntryPenalty > 0);
+    assert.equal(result.squeezePermissionOverride, "caution");
+    assert.notEqual(result.tradingPermission, "allowed");
+    assert.equal(result.entryTrigger.conditions.squeezeSafe, false);
+  }],
+  ["오래된 Squeeze Warning은 Decision에 보정하지 않는다", () => {
+    const input = baseInput(false);
+    input.squeezeWarning = {
+      id: 3,
+      observedAt: "2026-08-21T04:40:00.000Z",
+      longPhase: "ACTIVE",
+      shortPhase: "WATCH",
+      longAlertScore: 95,
+      shortAlertScore: 5,
+      dominantWarning: "long_squeeze",
+      longProbability: 92,
+      shortProbability: 8,
+      longRecommendedResponse: "defensive_exit",
+      shortRecommendedResponse: "observe",
+    };
+    const result = runDecisionEngineV2(input);
+    assert.equal(result.squeezeWarningStatus, "stale");
+    assert.equal(result.squeezeEntryPenalty, 0);
+    assert.equal(result.squeezePermissionOverride, null);
+  }],
+
   ["Regime 가중치 합계는 1이다", () => {
     const result = runDecisionEngineV2(baseInput(false));
     const sum = result.weights.technical + result.weights.news + result.weights.funding + result.weights.regime;

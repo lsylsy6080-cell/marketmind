@@ -14,6 +14,7 @@ export async function runDecisionV2(options?: { dryRun?: boolean; now?: Date }):
     marketStructure: source.marketStructure,
     openInterest: source.openInterest,
     liquidation: source.liquidation,
+    squeezeWarning: source.squeezeWarning,
     now: options?.now,
   });
 

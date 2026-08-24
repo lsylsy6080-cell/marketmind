@@ -468,10 +468,11 @@ function validateEntryTrigger(params: {
   dataReliability: number;
   tradingPermission: V2TradingPermission;
   fundingCrowding: FundingCrowdingEvaluation;
+  squeezeWarning: SqueezeDecisionEvaluation;
 }): EntryTriggerValidation {
   const {
     input, direction, entryPlan, entryQualityScore, overheatRisk,
-    dataReliability, tradingPermission, fundingCrowding,
+    dataReliability, tradingPermission, fundingCrowding, squeezeWarning,
   } = params;
 
   const previous = input.previousEntryPlan;
@@ -497,9 +498,10 @@ function validateEntryTrigger(params: {
       currentPrice, conditions: {
         priceZoneReached: false, entryScorePass: false, overheatPass: false,
         fifteenMinutePass: false, oneHourTrendPass: false, regimePass: false,
-        newsSafe: false, fundingSafe: false, reliabilityPass: false, permissionPass: false,
+        newsSafe: false, fundingSafe: false, squeezeSafe: false,
+        reliabilityPass: false, permissionPass: false,
       },
-      passedConditions: 0, totalConditions: 10, readyThreshold: 10,
+      passedConditions: 0, totalConditions: 11, readyThreshold: 11,
       blockers: ["유효한 방향성 Entry Plan이 없습니다."],
       reasons: ["Entry Trigger Validator를 실행할 수 있는 기준 계획이 없습니다."],
     };
@@ -535,6 +537,7 @@ function validateEntryTrigger(params: {
       ((isLong && fundingCrowding.side === "long_crowded") ||
         (!isLong && fundingCrowding.side === "short_crowded"))
     ),
+    squeezeSafe: squeezeWarning.entrySafe,
     reliabilityPass: dataReliability >= 55,
     permissionPass: tradingPermission !== "blocked",
   };
@@ -548,6 +551,7 @@ function validateEntryTrigger(params: {
     ["regimePass", "Regime 방향/추세 조건 미충족"],
     ["newsSafe", "News 방향이 진입 방향과 충돌"],
     ["fundingSafe", "Funding crowding이 진입 방향과 충돌"],
+    ["squeezeSafe", "Squeeze Early Warning이 신규 진입을 허용하지 않음"],
     ["reliabilityPass", `데이터 신뢰도 ${round(dataReliability)}/100 < 55`],
     ["permissionPass", "거래 권한 blocked"],
   ];
@@ -567,7 +571,7 @@ function validateEntryTrigger(params: {
 
   const reasons = [
     `기준 계획=${source} · 현재 ${round(currentPrice, 2)} · 1차 ${round(reference.firstInterestPrice, 2)} · 2차 ${round(reference.secondInterestPrice, 2)} · 무효화 ${round(reference.invalidationPrice, 2)}`,
-    `조건 ${passedConditions}/10 충족 · 상태 ${status}`,
+    `조건 ${passedConditions}/11 충족 · 상태 ${status}`,
   ];
   if (status === "READY") reasons.push("가격과 안전 조건이 모두 충족되어 진입 준비 상태입니다. 실제 주문은 별도 실행 계층에서 결정해야 합니다.");
   if (status === "RE_EVALUATE") reasons.push("2차 관심 구간에 도달했지만 일부 조건이 부족해 재평가가 필요합니다.");
@@ -577,7 +581,7 @@ function validateEntryTrigger(params: {
     status, zone, referencePlanSource: source,
     referencePlanCalculatedAt: sameSide ? (input.previousEntryPlanCalculatedAt ?? null) : null,
     referencePlan: reference,
-    currentPrice, conditions, passedConditions, totalConditions: 10, readyThreshold: 10,
+    currentPrice, conditions, passedConditions, totalConditions: 11, readyThreshold: 11,
     blockers, reasons,
   };
 }
@@ -838,6 +842,172 @@ function evaluateLiquidation(
   };
 }
 
+
+type SqueezeDecisionEvaluation = {
+  status: "active" | "inactive" | "stale";
+  longPhase: import("./types").SqueezeWarningDecisionContext["longPhase"];
+  shortPhase: import("./types").SqueezeWarningDecisionContext["shortPhase"];
+  dominantWarning: import("./types").SqueezeWarningDecisionContext["dominantWarning"];
+  entryPenalty: number;
+  overheatAdjustment: number;
+  reversalAdjustment: number;
+  permissionOverride: V2TradingPermission | null;
+  entrySafe: boolean;
+  recommendedResponse: string;
+  reason: string;
+};
+
+function squeezePhaseSeverity(
+  phase: import("./types").SqueezeWarningDecisionContext["longPhase"],
+): number {
+  switch (phase) {
+    case "ACTIVE": return 4;
+    case "IMMINENT": return 3;
+    case "BUILDING": return 2;
+    case "EXHAUSTION": return 1;
+    case "WATCH":
+    default: return 0;
+  }
+}
+
+function evaluateSqueezeWarning(
+  input: DecisionV2Input,
+  direction: V2Direction,
+  now: Date,
+): SqueezeDecisionEvaluation {
+  const warning = input.squeezeWarning;
+  const inactive: SqueezeDecisionEvaluation = {
+    status: "inactive",
+    longPhase: "WATCH",
+    shortPhase: "WATCH",
+    dominantWarning: "balanced",
+    entryPenalty: 0,
+    overheatAdjustment: 0,
+    reversalAdjustment: 0,
+    permissionOverride: null,
+    entrySafe: true,
+    recommendedResponse: "observe",
+    reason: "Squeeze Early Warning snapshot이 없어 Decision 보정을 적용하지 않았습니다.",
+  };
+
+  if (!warning) return inactive;
+
+  const ageMinutes =
+    (now.getTime() - new Date(warning.observedAt).getTime()) / 60_000;
+
+  if (!Number.isFinite(ageMinutes) || ageMinutes > 5) {
+    return {
+      ...inactive,
+      status: "stale",
+      longPhase: warning.longPhase,
+      shortPhase: warning.shortPhase,
+      dominantWarning: warning.dominantWarning,
+      reason: `Squeeze Early Warning이 ${round(ageMinutes, 1)}분 경과해 보정을 적용하지 않았습니다.`,
+    };
+  }
+
+  if (direction === "neutral") {
+    return {
+      ...inactive,
+      status: "active",
+      longPhase: warning.longPhase,
+      shortPhase: warning.shortPhase,
+      dominantWarning: warning.dominantWarning,
+      recommendedResponse:
+        warning.dominantWarning === "long_squeeze"
+          ? warning.longRecommendedResponse
+          : warning.dominantWarning === "short_squeeze"
+            ? warning.shortRecommendedResponse
+            : "observe",
+      reason:
+        `Squeeze Warning LONG=${warning.longPhase}(${round(warning.longAlertScore)}) · ` +
+        `SHORT=${warning.shortPhase}(${round(warning.shortAlertScore)}) · 현재 방향 neutral이라 진입 보정은 적용하지 않았습니다.`,
+    };
+  }
+
+  // A LONG position is directly endangered by long_squeeze.
+  // A SHORT position is directly endangered by short_squeeze.
+  const adversePhase = direction === "bullish" ? warning.longPhase : warning.shortPhase;
+  const chasePhase = direction === "bullish" ? warning.shortPhase : warning.longPhase;
+  const adverseAlert = direction === "bullish" ? warning.longAlertScore : warning.shortAlertScore;
+  const chaseAlert = direction === "bullish" ? warning.shortAlertScore : warning.longAlertScore;
+  const adverseResponse =
+    direction === "bullish" ? warning.longRecommendedResponse : warning.shortRecommendedResponse;
+  const chaseResponse =
+    direction === "bullish" ? warning.shortRecommendedResponse : warning.longRecommendedResponse;
+
+  const adverseSeverity = squeezePhaseSeverity(adversePhase);
+  const chaseSeverity = squeezePhaseSeverity(chasePhase);
+
+  const adverseBasePenalty = [0, 3, 6, 14, 24][adverseSeverity] ?? 0;
+  const chaseBasePenalty = [0, 3, 4, 8, 12][chaseSeverity] ?? 0;
+  const adverseScale = 0.5 + clamp(adverseAlert) / 200;
+  const chaseScale = 0.5 + clamp(chaseAlert) / 200;
+
+  const entryPenalty = round(
+    adverseBasePenalty * adverseScale + chaseBasePenalty * chaseScale,
+    2,
+  );
+
+  const adverseOverheat = [0, 3, 4, 8, 12][adverseSeverity] ?? 0;
+  const chaseOverheat = [0, 4, 5, 10, 16][chaseSeverity] ?? 0;
+  const overheatAdjustment = round(
+    adverseOverheat * adverseScale + chaseOverheat * chaseScale,
+    2,
+  );
+
+  const adverseReversal = [0, 4, 6, 13, 20][adverseSeverity] ?? 0;
+  const chaseReversal = [0, 3, 2, 5, 8][chaseSeverity] ?? 0;
+  const reversalAdjustment = round(
+    adverseReversal * adverseScale + chaseReversal * chaseScale,
+    2,
+  );
+
+  let permissionOverride: V2TradingPermission | null = null;
+  if (adversePhase === "ACTIVE") permissionOverride = "blocked";
+  else if (
+    adversePhase === "IMMINENT" ||
+    adversePhase === "BUILDING" ||
+    chasePhase === "ACTIVE" ||
+    chasePhase === "IMMINENT"
+  ) permissionOverride = "caution";
+
+  const entrySafe =
+    adversePhase !== "ACTIVE" &&
+    adversePhase !== "IMMINENT" &&
+    chasePhase !== "ACTIVE";
+
+  const recommendedResponse =
+    adverseSeverity >= chaseSeverity ? adverseResponse : chaseResponse;
+
+  return {
+    status: "active",
+    longPhase: warning.longPhase,
+    shortPhase: warning.shortPhase,
+    dominantWarning: warning.dominantWarning,
+    entryPenalty,
+    overheatAdjustment,
+    reversalAdjustment,
+    permissionOverride,
+    entrySafe,
+    recommendedResponse,
+    reason:
+      `Squeeze Warning LONG=${warning.longPhase}(${round(warning.longAlertScore)}) · ` +
+      `SHORT=${warning.shortPhase}(${round(warning.shortAlertScore)}) · ` +
+      `Entry -${entryPenalty} · Heat +${overheatAdjustment} · Reversal +${reversalAdjustment}` +
+      `${permissionOverride ? ` · permission=${permissionOverride}` : ""}`,
+  };
+}
+
+function mergeTradingPermission(
+  base: V2TradingPermission,
+  override: V2TradingPermission | null,
+): V2TradingPermission {
+  if (base === "blocked" || override === "blocked") return "blocked";
+  if (base === "caution" || override === "caution") return "caution";
+  return "allowed";
+}
+
 export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
   const now = input.now ?? new Date();
   const weights = getWeights(input.regime.regime);
@@ -865,15 +1035,18 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
   const fundingCrowding = evaluateFundingCrowding(input, direction);
   const openInterest = evaluateOpenInterest(input, direction, now);
   const liquidation = evaluateLiquidation(input, direction, now);
+  const squeezeWarning = evaluateSqueezeWarning(input, direction, now);
   const overheatRisk = round(clamp(
     baseOverheatRisk +
     openInterest.overheatAdjustment +
-    liquidation.overheatAdjustment
+    liquidation.overheatAdjustment +
+    squeezeWarning.overheatAdjustment
   ));
   const reversalRisk = round(clamp(
     baseReversalRisk +
     openInterest.reversalAdjustment +
-    liquidation.reversalAdjustment
+    liquidation.reversalAdjustment +
+    squeezeWarning.reversalAdjustment
   ));
 
   const weightedConfidence =
@@ -901,12 +1074,20 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
       riskPenalty -
       fundingCrowding.entryPenalty +
       openInterest.entryAdjustment +
-      liquidation.entryAdjustment,
+      liquidation.entryAdjustment -
+      squeezeWarning.entryPenalty,
   ));
   const entryQuality = determineEntryQuality(entryQualityScore);
   const riskLevel = determineRisk(input, reversalRisk, dataReliability);
   const baseTradingPermission = determinePermission(input, riskLevel, dataReliability);
-  const tradingPermission: V2TradingPermission = fundingCrowding.entryPenalty >= 8 && baseTradingPermission === "allowed" ? "caution" : baseTradingPermission;
+  const fundingAdjustedPermission: V2TradingPermission =
+    fundingCrowding.entryPenalty >= 8 && baseTradingPermission === "allowed"
+      ? "caution"
+      : baseTradingPermission;
+  const tradingPermission = mergeTradingPermission(
+    fundingAdjustedPermission,
+    squeezeWarning.permissionOverride,
+  );
   const action = determineAction({
     direction,
     finalScore,
@@ -936,6 +1117,7 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
     dataReliability,
     tradingPermission,
     fundingCrowding,
+    squeezeWarning,
   });
 
   const reasons = [
@@ -952,6 +1134,7 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
   reasons.push(fundingCrowding.reason);
   reasons.push(openInterest.reason);
   reasons.push(liquidation.reason);
+  reasons.push(squeezeWarning.reason);
 
   if (overheatRisk >= 50) reasons.push("상위 시간봉 과열/급등락 때문에 추격 진입을 억제하고 눌림목 대기를 우선했습니다.");
   if (input.regime.highVolatilityWeight >= 35) reasons.push("고변동 시간봉 비중이 높아 신규 진입 위험을 가중했습니다.");
@@ -999,6 +1182,15 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
     liquidationEntryAdjustment: liquidation.entryAdjustment,
     liquidationOverheatAdjustment: liquidation.overheatAdjustment,
     liquidationReversalAdjustment: liquidation.reversalAdjustment,
+    squeezeWarningStatus: squeezeWarning.status,
+    squeezeLongPhase: squeezeWarning.longPhase,
+    squeezeShortPhase: squeezeWarning.shortPhase,
+    squeezeDominantWarning: squeezeWarning.dominantWarning,
+    squeezeEntryPenalty: squeezeWarning.entryPenalty,
+    squeezeOverheatAdjustment: squeezeWarning.overheatAdjustment,
+    squeezeReversalAdjustment: squeezeWarning.reversalAdjustment,
+    squeezePermissionOverride: squeezeWarning.permissionOverride,
+    squeezeRecommendedResponse: squeezeWarning.recommendedResponse,
     weights,
     reasons,
     invalidationConditions: buildInvalidationConditions(input, direction),
@@ -1008,6 +1200,6 @@ export function runDecisionEngineV2(input: DecisionV2Input): DecisionV2Result {
       funding: round(contributions.funding),
       regime: round(contributions.regime),
     },
-    strategyVersion: "decision-engine-v2.7-liquidation",
+    strategyVersion: "decision-engine-v2.8-squeeze-aware",
   };
 }

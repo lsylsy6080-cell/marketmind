@@ -1,6 +1,9 @@
 import type {
   AdaptiveExecutionPlan,
   AdaptivePaperSide,
+  AdaptiveSqueezeEntryGuard,
+  AdaptiveSqueezeProtection,
+  AdaptiveSqueezeWarning,
   LiquidationSafetyResult,
 } from "./types";
 
@@ -225,4 +228,147 @@ export function determineAdaptiveCloseReason(input:{
   const openedMs=new Date(input.openedAt).getTime();
   if(Number.isFinite(openedMs) && now-openedMs>=input.maxHoldingMinutes*60_000) return "max_holding";
   return null;
+}
+
+
+function squeezePhaseSeverity(phase: AdaptiveSqueezeWarning["longPhase"]): number {
+  switch (phase) {
+    case "ACTIVE": return 4;
+    case "IMMINENT": return 3;
+    case "BUILDING": return 2;
+    case "EXHAUSTION": return 1;
+    case "WATCH":
+    default: return 0;
+  }
+}
+
+export function evaluateAdaptiveSqueezeEntryGuard(input:{
+  side:AdaptivePaperSide;
+  warning:AdaptiveSqueezeWarning|null;
+}):AdaptiveSqueezeEntryGuard{
+  const warning=input.warning;
+  if(!warning){
+    return {
+      allowed:true,
+      marginMultiplier:1,
+      adversePhase:"WATCH",
+      favorablePhase:"WATCH",
+      reason:"Squeeze warning 없음 — 기존 Adaptive sizing 유지",
+    };
+  }
+
+  const adversePhase=input.side==="long" ? warning.longPhase : warning.shortPhase;
+  const favorablePhase=input.side==="long" ? warning.shortPhase : warning.longPhase;
+  const adverseAlert=input.side==="long" ? warning.longAlertScore : warning.shortAlertScore;
+  const favorableAlert=input.side==="long" ? warning.shortAlertScore : warning.longAlertScore;
+
+  if(adversePhase==="ACTIVE" || adversePhase==="IMMINENT"){
+    return {
+      allowed:false,
+      marginMultiplier:0,
+      adversePhase,
+      favorablePhase,
+      reason:`${input.side.toUpperCase()} 반대방향 squeeze ${adversePhase} · 신규 진입 차단`,
+    };
+  }
+
+  // 같은 방향의 스퀴즈가 ACTIVE일 때 추격진입도 금지한다.
+  if(favorablePhase==="ACTIVE"){
+    return {
+      allowed:false,
+      marginMultiplier:0,
+      adversePhase,
+      favorablePhase,
+      reason:`${input.side.toUpperCase()} 방향 squeeze ACTIVE · 추격 신규진입 차단`,
+    };
+  }
+
+  let multiplier=1;
+  if(adversePhase==="BUILDING") multiplier=Math.min(multiplier,0.70);
+  if(favorablePhase==="IMMINENT") multiplier=Math.min(multiplier,0.70);
+  if(favorablePhase==="BUILDING") multiplier=Math.min(multiplier,0.85);
+  if(adversePhase==="EXHAUSTION" || favorablePhase==="EXHAUSTION"){
+    multiplier=Math.min(multiplier,0.80);
+  }
+
+  if(adverseAlert>=70 || favorableAlert>=70) multiplier=Math.min(multiplier,0.80);
+
+  return {
+    allowed:true,
+    marginMultiplier:round(clamp(multiplier,0.25,1),2),
+    adversePhase,
+    favorablePhase,
+    reason:`Squeeze 진입가드 · adverse=${adversePhase}(${round(adverseAlert,1)}) · favorable=${favorablePhase}(${round(favorableAlert,1)}) · margin x${round(multiplier,2)}`,
+  };
+}
+
+export function evaluateAdaptiveSqueezeProtection(input:{
+  side:AdaptivePaperSide;
+  marketPrice:number;
+  entryPrice:number;
+  currentStopLossPrice:number;
+  warning:AdaptiveSqueezeWarning|null;
+}):AdaptiveSqueezeProtection{
+  if(!input.warning){
+    return {
+      action:"hold",
+      relevantPhase:"WATCH",
+      relevantAlertScore:0,
+      newStopLossPrice:null,
+      reason:"Squeeze warning 없음",
+    };
+  }
+
+  const phase=input.side==="long" ? input.warning.longPhase : input.warning.shortPhase;
+  const alert=input.side==="long" ? input.warning.longAlertScore : input.warning.shortAlertScore;
+
+  if(phase==="ACTIVE"){
+    return {
+      action:"close",
+      relevantPhase:phase,
+      relevantAlertScore:round(alert,2),
+      newStopLossPrice:null,
+      reason:`${input.side.toUpperCase()} squeeze ACTIVE(${round(alert,1)}) · 방어적 청산`,
+    };
+  }
+
+  let trailDistancePercent:number|null=null;
+  if(phase==="IMMINENT") trailDistancePercent=0.5;
+  else if(phase==="BUILDING" && alert>=60) trailDistancePercent=1.0;
+
+  if(trailDistancePercent!=null){
+    const candidate=input.side==="long"
+      ? input.marketPrice*(1-trailDistancePercent/100)
+      : input.marketPrice*(1+trailDistancePercent/100);
+
+    let nextStop=input.side==="long"
+      ? Math.max(input.currentStopLossPrice,candidate)
+      : Math.min(input.currentStopLossPrice,candidate);
+
+    // Stop must stay on the valid side of current market price.
+    if(input.side==="long") nextStop=Math.min(nextStop,input.marketPrice*0.999);
+    else nextStop=Math.max(nextStop,input.marketPrice*1.001);
+
+    const improves=input.side==="long"
+      ? nextStop>input.currentStopLossPrice
+      : nextStop<input.currentStopLossPrice;
+
+    if(improves){
+      return {
+        action:"tighten_stop",
+        relevantPhase:phase,
+        relevantAlertScore:round(alert,2),
+        newStopLossPrice:round(nextStop,8),
+        reason:`${input.side.toUpperCase()} squeeze ${phase}(${round(alert,1)}) · protective stop ${round(nextStop,2)}로 강화`,
+      };
+    }
+  }
+
+  return {
+    action:"hold",
+    relevantPhase:phase,
+    relevantAlertScore:round(alert,2),
+    newStopLossPrice:null,
+    reason:`${input.side.toUpperCase()} squeeze ${phase}(${round(alert,1)}) · 즉시 방어조치 불필요`,
+  };
 }

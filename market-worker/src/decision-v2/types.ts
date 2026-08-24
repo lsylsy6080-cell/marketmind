@@ -56,6 +56,20 @@ export interface LiquidationDecisionContext {
   reasons: string[];
 }
 
+export interface SqueezeWarningDecisionContext {
+  id: number;
+  observedAt: string;
+  longPhase: "WATCH" | "BUILDING" | "IMMINENT" | "ACTIVE" | "EXHAUSTION";
+  shortPhase: "WATCH" | "BUILDING" | "IMMINENT" | "ACTIVE" | "EXHAUSTION";
+  longAlertScore: number;
+  shortAlertScore: number;
+  dominantWarning: "long_squeeze" | "short_squeeze" | "balanced";
+  longProbability: number;
+  shortProbability: number;
+  longRecommendedResponse: string;
+  shortRecommendedResponse: string;
+}
+
 export interface OpenInterestDecisionContext {
   id: number;
   observedAt: string;
@@ -90,6 +104,7 @@ export interface EntryTriggerValidation {
     regimePass: boolean;
     newsSafe: boolean;
     fundingSafe: boolean;
+    squeezeSafe: boolean;
     reliabilityPass: boolean;
     permissionPass: boolean;
   };
@@ -110,6 +125,7 @@ export interface DecisionV2Input {
   marketStructure?: EntryMarketStructure | null;
   openInterest?: OpenInterestDecisionContext | null;
   liquidation?: LiquidationDecisionContext | null;
+  squeezeWarning?: SqueezeWarningDecisionContext | null;
   now?: Date;
 }
 
@@ -174,6 +190,15 @@ export interface DecisionV2Result {
   liquidationEntryAdjustment: number;
   liquidationOverheatAdjustment: number;
   liquidationReversalAdjustment: number;
+  squeezeWarningStatus: "active" | "inactive" | "stale";
+  squeezeLongPhase: SqueezeWarningDecisionContext["longPhase"];
+  squeezeShortPhase: SqueezeWarningDecisionContext["shortPhase"];
+  squeezeDominantWarning: SqueezeWarningDecisionContext["dominantWarning"];
+  squeezeEntryPenalty: number;
+  squeezeOverheatAdjustment: number;
+  squeezeReversalAdjustment: number;
+  squeezePermissionOverride: V2TradingPermission | null;
+  squeezeRecommendedResponse: string;
   weights: DecisionV2Weights;
   reasons: string[];
   invalidationConditions: string[];

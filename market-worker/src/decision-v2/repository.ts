@@ -11,6 +11,7 @@ interface SourceBundle {
   funding: DecisionV2Component & { id: number };
   openInterest: import("./types").OpenInterestDecisionContext | null;
   liquidation: import("./types").LiquidationDecisionContext | null;
+  squeezeWarning: import("./types").SqueezeWarningDecisionContext | null;
   regime: MarketRegimeResult & { sourceId: number };
   v1DecisionId: number | null;
 }
@@ -22,7 +23,7 @@ const asNumber = (value: unknown, field: string): number => {
 };
 
 export async function loadDecisionV2Sources(): Promise<SourceBundle> {
-  const [technicalResult, newsResult, fundingResult, regimeResult, v1Result, calibrationResult, previousPlanResult, candles15mResult, candles1hResult, openInterestResult, liquidationResult] = await Promise.all([
+  const [technicalResult, newsResult, fundingResult, regimeResult, v1Result, calibrationResult, previousPlanResult, candles15mResult, candles1hResult, openInterestResult, liquidationResult, squeezeWarningResult] = await Promise.all([
     supabase.from("market_scores")
       .select("id,analyzed_at,total_score,confidence,direction,risk_level,trading_permission,score_details")
       .eq("symbol", "BTCUSDT").order("analyzed_at", { ascending: false }).limit(1).maybeSingle(),
@@ -43,7 +44,7 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
       .eq("strategy_version", "signal-calibration-v2.3a3").order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("ai_decision_v2_snapshots")
       .select("calculated_at,entry_plan,entry_trigger,strategy_version").eq("symbol", "BTCUSDT")
-      .in("strategy_version", ["decision-engine-v2.5-entry-timing", "decision-engine-v2.5.1-entry-trigger-validator", "decision-engine-v2.6-open-interest", "decision-engine-v2.7-liquidation"])
+      .in("strategy_version", ["decision-engine-v2.5-entry-timing", "decision-engine-v2.5.1-entry-trigger-validator", "decision-engine-v2.6-open-interest", "decision-engine-v2.7-liquidation", "decision-engine-v2.8-squeeze-aware"])
       .not("entry_plan", "is", null).order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("market_candles")
       .select("open_time,high,low").eq("exchange","binance").eq("market_type","spot").eq("symbol","BTCUSDT")
@@ -57,6 +58,9 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
     supabase.from("btc_liquidation_snapshots")
       .select("id,ended_at,state,directional_bias,confidence,long_liquidation_usd,short_liquidation_usd,total_liquidation_usd,burst_multiple,dominance_ratio,stream_healthy,entry_adjustment,overheat_adjustment,reversal_adjustment,reasons")
       .eq("symbol","BTCUSDT").order("bucket_time",{ascending:false}).limit(1).maybeSingle(),
+    supabase.from("squeeze_early_warning_snapshots")
+      .select("id,calculated_at,long_phase,short_phase,long_alert_score,short_alert_score,dominant_warning,long_warning,short_warning")
+      .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
   ]);
 
   for (const [label, result] of [
@@ -138,6 +142,21 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
     reasons: Array.isArray(liq.reasons) ? liq.reasons.map(String) : [],
   } as import("./types").LiquidationDecisionContext : null;
 
+  const sw = squeezeWarningResult.error ? null : (squeezeWarningResult.data as any);
+  const squeezeWarning = sw ? {
+    id: Number(sw.id),
+    observedAt: String(sw.calculated_at),
+    longPhase: sw.long_phase,
+    shortPhase: sw.short_phase,
+    longAlertScore: asNumber(sw.long_alert_score ?? 0, "squeeze.long_alert_score"),
+    shortAlertScore: asNumber(sw.short_alert_score ?? 0, "squeeze.short_alert_score"),
+    dominantWarning: sw.dominant_warning,
+    longProbability: asNumber(sw.long_warning?.probability ?? 0, "squeeze.long_probability"),
+    shortProbability: asNumber(sw.short_warning?.probability ?? 0, "squeeze.short_probability"),
+    longRecommendedResponse: String(sw.long_warning?.recommendedResponse ?? "observe"),
+    shortRecommendedResponse: String(sw.short_warning?.recommendedResponse ?? "observe"),
+  } as import("./types").SqueezeWarningDecisionContext : null;
+
   return {
     previousEntryPlan,
     previousEntryPlanCalculatedAt:
@@ -145,6 +164,7 @@ export async function loadDecisionV2Sources(): Promise<SourceBundle> {
     marketStructure,
     openInterest,
     liquidation,
+    squeezeWarning,
     technical: {
       id: Number(t.id), score: asNumber(t.total_score, "technical.score"),
       confidence: asNumber(t.confidence, "technical.confidence"), direction: t.direction,
@@ -228,6 +248,16 @@ export async function saveDecisionV2(result: DecisionV2Result, source: SourceBun
     liquidation_entry_adjustment: result.liquidationEntryAdjustment,
     liquidation_overheat_adjustment: result.liquidationOverheatAdjustment,
     liquidation_reversal_adjustment: result.liquidationReversalAdjustment,
+    squeeze_warning_snapshot_id: source.squeezeWarning?.id ?? null,
+    squeeze_warning_status: result.squeezeWarningStatus,
+    squeeze_long_phase: result.squeezeLongPhase,
+    squeeze_short_phase: result.squeezeShortPhase,
+    squeeze_dominant_warning: result.squeezeDominantWarning,
+    squeeze_entry_penalty: result.squeezeEntryPenalty,
+    squeeze_overheat_adjustment: result.squeezeOverheatAdjustment,
+    squeeze_reversal_adjustment: result.squeezeReversalAdjustment,
+    squeeze_permission_override: result.squeezePermissionOverride,
+    squeeze_recommended_response: result.squeezeRecommendedResponse,
     weights: result.weights,
     component_contributions: result.componentContributions,
     decision_reasons: result.reasons,

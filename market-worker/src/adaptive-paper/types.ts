@@ -4,7 +4,8 @@ export type AdaptivePaperCloseReason =
   | "take_profit"
   | "trigger_invalidated"
   | "opposite_direction"
-  | "max_holding";
+  | "max_holding"
+  | "squeeze_active";
 
 export interface LiquidationSafetyResult {
   requestedLeverage: number;
@@ -51,4 +52,32 @@ export interface AdaptivePaperSummary {
   positionId?: number;
   tradeId?: number;
   plan?: AdaptiveExecutionPlan;
+}
+
+
+export type AdaptiveSqueezePhase = "WATCH" | "BUILDING" | "IMMINENT" | "ACTIVE" | "EXHAUSTION";
+
+export interface AdaptiveSqueezeWarning {
+  snapshotId: number | null;
+  observedAt: string | null;
+  longPhase: AdaptiveSqueezePhase;
+  shortPhase: AdaptiveSqueezePhase;
+  longAlertScore: number;
+  shortAlertScore: number;
+}
+
+export interface AdaptiveSqueezeProtection {
+  action: "hold" | "tighten_stop" | "close";
+  relevantPhase: AdaptiveSqueezePhase;
+  relevantAlertScore: number;
+  newStopLossPrice: number | null;
+  reason: string;
+}
+
+export interface AdaptiveSqueezeEntryGuard {
+  allowed: boolean;
+  marginMultiplier: number;
+  adversePhase: AdaptiveSqueezePhase;
+  favorablePhase: AdaptiveSqueezePhase;
+  reason: string;
 }

@@ -5,7 +5,7 @@ const n=(v:unknown):number|null=>{const x=Number(v);return Number.isFinite(x)?x:
 export async function runSqueezeProbability(){
  const [{data:liqMap,error:lmErr},{data:oi,error:oiErr},{data:liq,error:liqErr},{data:gf,error:gfErr}]=await Promise.all([
   supabase.from("estimated_liquidation_maps").select("current_price,long_zones,short_zones,calculated_at").eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
-  supabase.from("open_interest_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
+  supabase.from("btc_open_interest_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
   supabase.from("btc_liquidation_snapshots").select("*").eq("symbol","BTCUSDT").order("bucket_time",{ascending:false}).limit(1).maybeSingle(),
   supabase.from("global_futures_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
  ]);
