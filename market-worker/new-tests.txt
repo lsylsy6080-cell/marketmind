@@ -1,1 +1,1 @@
-src\phase8-ab\Phase812ContextABValidator.test.ts
+src\news\NewsSchedule.test.ts

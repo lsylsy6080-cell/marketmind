@@ -2,10 +2,8 @@ import { createHash } from "node:crypto";
 import Parser from "rss-parser";
 
 import { supabase } from "../lib/supabase";
-import {
-  NEWS_SOURCES,
-  type NewsSource,
-} from "./news-sources";
+import { NEWS_SOURCES, type NewsSource } from "./news-sources";
+import { buildEventFingerprint, calculateBtcRelevance, normalizeNewsText } from "./news-pipeline-utils";
 
 interface RssCustomItem {
   guid?: string;
@@ -27,6 +25,9 @@ interface NewsArticleRow {
   language: string;
   published_at: string;
   raw_data: Record<string, unknown>;
+  relevance_score: number;
+  event_fingerprint: string;
+  translation_status: "pending";
 }
 
 const parser: Parser<Record<string, never>, RssCustomItem> =
@@ -34,7 +35,7 @@ const parser: Parser<Record<string, never>, RssCustomItem> =
     timeout: 15_000,
     headers: {
       "User-Agent":
-        "MarketMind-AI-News-Collector/1.0",
+        "MarketMind-AI-News-Collector/2.0",
       Accept:
         "application/rss+xml, application/xml, text/xml, */*",
     },
@@ -50,17 +51,8 @@ const BTC_KEYWORDS = [
   "strategy",
 ];
 
-function normalizeWhitespace(
-  value: string | undefined,
-): string {
-  return (value ?? "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&#39;/gi, "'")
-    .replace(/&quot;/gi, '"')
-    .replace(/\s+/g, " ")
-    .trim();
+function normalizeWhitespace(value: string | undefined): string {
+  return normalizeNewsText(value);
 }
 
 function isBtcRelevant(
@@ -131,7 +123,8 @@ async function collectSource(
       continue;
     }
 
-    if (!isBtcRelevant(title, summary)) {
+    const relevanceScore = calculateBtcRelevance(title, summary);
+    if (!isBtcRelevant(title, summary) || relevanceScore < 35) {
       continue;
     }
 
@@ -161,6 +154,9 @@ async function collectSource(
       asset: source.asset,
       language: source.language,
       published_at: publishedAt,
+      relevance_score: relevanceScore,
+      event_fingerprint: buildEventFingerprint(title),
+      translation_status: "pending",
       raw_data: {
         guid: item.guid ?? null,
         creator: item.creator ?? null,

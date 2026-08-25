@@ -30,6 +30,9 @@ import { collectBtcNews } from "../src/news/collect-news";
 import { analyzePendingBtcNewsByRules } from "../src/news/analyze-news-rules";
 import { generateBtcNewsScore } from "../src/news/btc-news-score";
 import { enrichLatestBtcNewsScore } from "../src/news/btc-news-intelligence-v2";
+import { markRecentNewsDuplicates } from "../src/news/news-dedupe-worker";
+import { editPendingNewsToKorean } from "../src/news/korean-news-editor";
+import { resolveNewsIntervalMinutes, shouldRunNewsCycle } from "../src/news/news-schedule";
 import { generateBtcFundingSnapshot } from "../src/funding/generate-btc-funding-snapshot";
 import { collectOpenInterestSnapshot } from "../src/open-interest/collect-open-interest";
 import { LiquidationStreamCollector } from "../src/liquidation/LiquidationStreamCollector";
@@ -49,10 +52,8 @@ const CYCLE_INTERVAL_MS = Math.max(
   30,
   Number(process.env.WORKER_PIPELINE_INTERVAL_SECONDS ?? 60),
 ) * 1_000;
-const NEWS_INTERVAL_MS = Math.max(
-  5,
-  Number(process.env.WORKER_NEWS_INTERVAL_MINUTES ?? 15),
-) * 60_000;
+const NEWS_INTERVAL_MINUTES = resolveNewsIntervalMinutes(process.env.WORKER_NEWS_INTERVAL_MINUTES);
+const NEWS_INTERVAL_MS = NEWS_INTERVAL_MINUTES * 60_000;
 const PERFORMANCE_INTERVAL_MS = Math.max(
   15,
   Number(process.env.WORKER_PERFORMANCE_INTERVAL_MINUTES ?? 60),
@@ -199,6 +200,8 @@ async function collectContinuous(initial: boolean): Promise<void> {
 async function runNewsFundingCycle(): Promise<void> {
   await safeTask("뉴스 수집", () => collectBtcNews());
   await safeTask("뉴스 룰 분석", () => analyzePendingBtcNewsByRules(50));
+  await safeTask("뉴스 사건 중복 정리", () => markRecentNewsDuplicates(48));
+  await safeTask("뉴스 한국어 속보 편집", () => editPendingNewsToKorean(20));
   await safeTask("뉴스 점수", () => generateBtcNewsScore(24));
   await safeTask("뉴스 인텔리전스", () => enrichLatestBtcNewsScore());
   await safeTask("Funding snapshot", () => generateBtcFundingSnapshot());
@@ -359,7 +362,7 @@ async function runPipelineCycle(initial = false): Promise<void> {
   }
 
   const now = Date.now();
-  if (initial || now - lastNewsAt >= NEWS_INTERVAL_MS) {
+  if (shouldRunNewsCycle({ initial, now, lastRunAt: lastNewsAt, intervalMinutes: NEWS_INTERVAL_MINUTES })) {
     await runNewsFundingCycle();
   }
 
@@ -382,7 +385,7 @@ async function main(): Promise<void> {
 
   log(
     `Multi-Loop Worker 시작 · pipeline=${CYCLE_INTERVAL_MS / 1000}s` +
-      ` · news=${NEWS_INTERVAL_MS / 60_000}m` +
+      ` · news=${NEWS_INTERVAL_MINUTES}m` +
       ` · performance=${PERFORMANCE_INTERVAL_MS / 60_000}m`,
   );
 

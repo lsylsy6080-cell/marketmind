@@ -44,6 +44,8 @@ const SOURCE_WEIGHTS: Record<string, number> = {
   CoinDesk: 1,
   Decrypt: 0.94,
   Cointelegraph: 0.9,
+  "Bitcoin Magazine": 0.91,
+  Blockworks: 0.96,
   Reuters: 1.08,
   Bloomberg: 1.08,
 };

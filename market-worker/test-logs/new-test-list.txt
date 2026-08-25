@@ -1,1 +1,1 @@
-C:\Project\coin-research\market-worker\src\phase8-ab\Phase812ContextABValidator.test.ts
+C:\Project\coin-research\market-worker\src\news\NewsSchedule.test.ts

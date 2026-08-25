@@ -1,11 +1,11 @@
 ============================================================
 Market Worker 신규 테스트 결과
-실행 시각: 2026-08-25 13:11:05.26
+실행 시각: 2026-08-25 14:36:10.14
 프로젝트: C:\Project\coin-research\market-worker
 감지 기준: new-tests.txt 현재 단계 목록
 ============================================================
 
-[목록 1] src\phase8-ab\Phase812ContextABValidator.test.ts
+[목록 1] src\news\NewsSchedule.test.ts
 
 [1/2] TypeScript 타입 검사
 ------------------------------------------------------------
@@ -20,14 +20,14 @@ Market Worker 신규 테스트 결과
 ------------------------------------------------------------
 
 ------------------------------------------------------------
-[NEW TEST 1 / 1] Phase812ContextABValidator.test.ts
-경로: C:\Project\coin-research\market-worker\src\phase8-ab\
+[NEW TEST 1 / 1] NewsSchedule.test.ts
+경로: C:\Project\coin-research\market-worker\src\news\
 ------------------------------------------------------------
-[PASS] candidate 성과 우세면 candidate
-[PASS] baseline 성과 우세면 baseline
-[PASS] 차이가 작으면 tie
-[PASS] 점수 변화량을 계산한다
-[PASS] 자동 승격은 금지
+[PASS] 환경변수가 없으면 뉴스 주기는 기본 10분
+[PASS] 5분 미만 설정은 5분으로 제한
+[PASS] 60분 초과 설정은 60분으로 제한
+[PASS] 부팅 cycle에서는 즉시 뉴스 실행
+[PASS] 일반 cycle은 설정 주기가 지난 뒤에만 실행
 
 ============================================================
 [성공] 현재 단계 신규 테스트를 모두 통과했습니다.

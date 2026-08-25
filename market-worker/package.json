@@ -68,7 +68,9 @@
     "phase8:context:test": "tsx src/phase8-context/Phase83MarketContext.test.ts",
     "phase8:context:run": "tsx scripts/run-phase8-market-context.ts",
     "phase8:decision-gate:test": "tsx src/phase8-decision-gate/Phase84ContextDecisionGate.test.ts",
-    "phase8:decision-gate:run": "tsx scripts/run-phase8-context-decision-gate.ts"
+    "phase8:decision-gate:run": "tsx scripts/run-phase8-context-decision-gate.ts",
+    "news:pipeline:run": "tsx scripts/run-news-pipeline-v1.ts",
+    "news:pipeline:test": "tsx src/news/NewsPipelineV1.test.ts"
   },
   "keywords": [],
   "author": "",
