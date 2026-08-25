@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { aggregateCorrelationIntelligence, analyzeTimeframeCorrelation } from "./MarketCorrelationEngine";
+import type { CorrelationCandle, CorrelationTimeframeResult } from "./types";
+function candles(values:number[],start=Date.UTC(2026,0,1)):CorrelationCandle[]{return values.map((close,i)=>({openTime:new Date(start+i*60000).toISOString(),close}));}
+function test(name:string,fn:()=>void){try{fn();console.log(`[PASS] ${name}`);}catch(e){console.error(`[FAIL] ${name}`);throw e;}}
+const base=Array.from({length:80},(_,i)=>100+i*0.4+Math.sin(i/3)*2);
+test("Spot/Futures 동조 수익률은 높은 상관으로 계산한다",()=>{const r=analyzeTimeframeCorrelation({timeframe:"1h",spotCandles:candles(base),futuresCandles:candles(base.map((v,i)=>v*1.0005+Math.sin(i)*0.01))});assert.ok(r.returnCorrelation>0.95);assert.equal(r.state,"synchronized");});
+test("반대 움직임이 커지면 decoupled로 판정한다",()=>{const f=base.map((_,i)=>140-i*0.35-Math.sin(i/3)*2);const r=analyzeTimeframeCorrelation({timeframe:"15m",spotCandles:candles(base),futuresCandles:candles(f)});assert.ok(r.returnCorrelation<0);assert.equal(r.state,"decoupled");assert.ok(r.divergenceScore>=65);});
+test("선물 premium은 basisPercent에 반영한다",()=>{const r=analyzeTimeframeCorrelation({timeframe:"4h",spotCandles:candles(base),futuresCandles:candles(base.map(v=>v*1.003))});assert.ok(r.basisPercent>0.29&&r.basisPercent<0.31);});
+test("3개 시간봉을 가중 집계해 종합 상태와 위험도를 만든다",()=>{const item=(timeframe:"15m"|"1h"|"4h",corr:number,score:number,basis=0.05):CorrelationTimeframeResult=>({timeframe,pairCount:100,returnCorrelation:corr,spotReturnPercent:1,futuresReturnPercent:1.1,returnGapPercent:0.1,basisPercent:basis,leadLagLeader:"none",leadLagStrength:0,state:corr<0.45?"decoupled":corr<0.8?"diverging":"synchronized",divergenceScore:score});const r=aggregateCorrelationIntelligence([item("15m",0.9,15),item("1h",0.85,20),item("4h",0.88,18)]);assert.equal(r.state,"synchronized");assert.equal(r.riskLevel,"low");assert.equal(r.strategyVersion,"phase8-correlation-v8.2");});
+test("표본이 부족하면 분석을 차단한다",()=>{assert.throws(()=>analyzeTimeframeCorrelation({timeframe:"1h",spotCandles:candles(base.slice(0,20)),futuresCandles:candles(base.slice(0,20))}),/표본 부족/);});

@@ -126,7 +126,6 @@ export async function collectBinanceBtcCandles(
   const rows = completedKlines.map(mapKlineToRow);
 
   if (rows.length === 0) {
-    console.log("저장할 완료 캔들이 없습니다.");
     return 0;
   }
 

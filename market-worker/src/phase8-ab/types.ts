@@ -1,0 +1,2 @@
+export interface ABInput{baselineReturn:number;candidateReturn:number;baselineQuality:number;candidateQuality:number;baselineSuccessRate:number;candidateSuccessRate:number}
+export interface ABResult{winner:"baseline"|"candidate"|"tie";scoreDelta:number;promotionAllowed:false;reasons:string[];strategyVersion:"phase8-context-ab-v8.12"}

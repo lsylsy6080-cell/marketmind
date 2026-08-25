@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { runPhase86ContextExecutionGuard } from "../phase8-execution-guard/run-phase8-context-execution-guard";
 import {
   buildAdaptiveExecutionPlan,
   determineAdaptiveCloseReason,
@@ -272,6 +273,15 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
   }
 
   const entrySide=v2.direction==="bullish"?"long":"short";
+
+  // Phase 8-6: 8-5 Context Activation을 실제 Adaptive Paper 신규 진입에 연결.
+  // 기존 포지션 청산/보호 로직은 건드리지 않고 신규 진입만 보수적으로 제한합니다.
+  const contextExecutionGuard=await runPhase86ContextExecutionGuard(entrySide);
+  if(!contextExecutionGuard.sideAllowed){
+    await saveEquitySnapshot(account,null,marketPrice);
+    return {action:"skipped",reason:`Context Execution Guard BLOCKED · ${contextExecutionGuard.reasons.join(" / ")}`};
+  }
+
   const squeezeEntryGuard=evaluateAdaptiveSqueezeEntryGuard({
     side:entrySide,
     warning:squeezeWarning,
@@ -299,7 +309,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
   const plan=buildAdaptiveExecutionPlan({
     side:entrySide,
     marketPrice,invalidationPrice,
-    marginPercent:num(sizing.margin_percent)*squeezeEntryGuard.marginMultiplier,
+    marginPercent:num(sizing.margin_percent)*squeezeEntryGuard.marginMultiplier*contextExecutionGuard.marginMultiplier,
     leverage:Math.trunc(num(sizing.leverage)),
     accountEquity:equityForSizing,
     feeRatePercent:FEE_RATE_PERCENT,targetRiskReward:TARGET_RR,
@@ -352,6 +362,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     positionId:num(result.position_id),plan,
     reason:`READY → ${plan.side.toUpperCase()} · margin ${plan.marginPercent}% · ${plan.leverage}x` +
       `${squeezeEntryGuard.marginMultiplier<1 ? ` · squeeze margin x${squeezeEntryGuard.marginMultiplier}` : ""}` +
+      `${contextExecutionGuard.marginMultiplier<1 ? ` · context margin x${contextExecutionGuard.marginMultiplier}` : ""}` +
       `${plan.leverageAdjusted ? ` (요청 ${plan.requestedLeverage}x에서 안전조정)` : ""}` +
       ` · liq ${round(plan.estimatedLiquidationPrice,2)} · notional ${round(plan.notionalAmount,2)} USDT`,
   };

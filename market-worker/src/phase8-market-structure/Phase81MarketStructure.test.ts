@@ -1,0 +1,12 @@
+import { buildVolumeProfile } from "./VolumeProfileEngine";
+import { buildSupportResistance, detectSwings } from "./SupportResistanceEngine";
+const candles=Array.from({length:100},(_,i)=>({openTime:new Date(1700000000000+i*60000).toISOString(),open:100+i*.1,high:101+i*.1,low:99+i*.1,close:100.5+i*.1,volume:10+i%7,quoteVolume:(10+i%7)*(100.5+i*.1)}));
+const profile=buildVolumeProfile("spot","24h","5m",candles);
+if(!profile.poc||profile.hvn.length===0)throw new Error("profile 실패");
+console.log("[PASS] Volume Profile POC/HVN/LVN 계산");
+const swings=detectSwings([{openTime:"1",high:10,low:8},{openTime:"2",high:12,low:7},{openTime:"3",high:11,low:8},{openTime:"4",high:13,low:9},{openTime:"5",high:12,low:8}],"1h","spot",1);
+if(!swings.length)throw new Error("swing 실패");
+console.log("[PASS] Swing High/Low 탐지");
+const sr=buildSupportResistance(110,[profile],swings);
+if(!sr.supportLevels.length)throw new Error("S/R 실패");
+console.log("[PASS] Support/Resistance 강도 및 거리 계산");

@@ -115,9 +115,6 @@ export async function collectBtcChartTimeframes(
     try {
       const count = await saveInterval(interval, limit);
       result[interval] = count;
-      console.log(
-        `[multi-timeframe] BTCUSDT ${interval}: ${count}개 저장 완료`,
-      );
     } catch (error) {
       // 하나의 시간봉 실패가 전체 AI 워커를 중단시키지 않도록 분리합니다.
       const message =

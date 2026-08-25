@@ -12,6 +12,17 @@ import process from "node:process";
 
 import { collectBinanceBtcCandles } from "../src/collectors/binance-btc";
 import { collectBtcChartTimeframes } from "../src/collectors/binance-multi-timeframe";
+import { collectBtcFuturesTimeframes } from "../src/collectors/binance-futures-timeframe";
+import { runPhase81MarketStructure } from "../src/phase8-market-structure/run-phase8-market-structure";
+import { runPhase82Correlation } from "../src/phase8-correlation/run-phase8-correlation";
+import { runPhase83MarketContext } from "../src/phase8-context/run-phase8-market-context";
+import { runPhase84ContextDecisionGate } from "../src/phase8-decision-gate/run-phase8-context-decision-gate";
+import { runPhase85ContextActivation } from "../src/phase8-activation/run-phase8-context-activation";
+import { runPhase87ContextOutcome } from "../src/phase8-outcome/run-phase8-context-outcome";
+import { runPhase88ContextPerformance } from "../src/phase8-performance/run-phase8-context-performance";
+import { runPhase89SafetyPromotion } from "../src/phase8-promotion/run-phase8-safety-promotion";
+import { runPhase810AdaptiveContextTuning } from "../src/phase8-tuning/run-phase8-adaptive-context-tuning";
+import { runPhase811AutoRollbackProtection } from "../src/phase8-rollback/run-phase8-auto-rollback-protection";
 import { analyzeBtcTechnical } from "../src/analyzers/btc-technical";
 import { generateBtcMarketScore } from "../src/analyzers/btc-market-score";
 import { runMarketRegimeV2 } from "../src/regime/run-market-regime-v2";
@@ -48,7 +59,7 @@ const PERFORMANCE_INTERVAL_MS = Math.max(
 ) * 60_000;
 
 const INITIAL_ONE_MINUTE_LIMIT = 1000;
-const INITIAL_MTF_LIMIT = 500;
+const INITIAL_MTF_LIMIT = 1000;
 const CONTINUOUS_ONE_MINUTE_LIMIT = 10;
 const CONTINUOUS_MTF_LIMIT = 3;
 
@@ -146,7 +157,6 @@ async function safeTask<T>(
   const started = Date.now();
   try {
     const value = await task();
-    log(`✓ ${label} · ${((Date.now() - started) / 1000).toFixed(1)}s`);
     return { ok: true, value };
   } catch (error) {
     console.error(
@@ -165,9 +175,8 @@ async function collectContinuous(initial: boolean): Promise<void> {
   const oneMinute = await safeTask("1m 캔들 수집", () =>
     collectBinanceBtcCandles(oneMinuteLimit),
   );
-  const mtf = await safeTask("MTF 캔들 동기화", () =>
-    collectBtcChartTimeframes(mtfLimit),
-  );
+  const mtf = await safeTask("Spot MTF 동기화", () => collectBtcChartTimeframes(mtfLimit));
+  const futuresMtf = await safeTask("Futures MTF 동기화", () => collectBtcFuturesTimeframes(mtfLimit));
   await safeTask("Open Interest 수집/분석", () => collectOpenInterestSnapshot());
   await safeTask("Global Futures 5개 거래소 수집", () => collectGlobalFuturesSnapshot());
   await safeTask("Position Cluster Map", () => runPositionClusterMap());
@@ -180,17 +189,14 @@ async function collectContinuous(initial: boolean): Promise<void> {
     log(`⚡ Squeeze Opportunity ${o.preferredDirection.toUpperCase()} · LONG=${o.longOpportunity.status}/${o.longOpportunity.score.toFixed(0)} · SHORT=${o.shortOpportunity.status}/${o.shortOpportunity.score.toFixed(0)}`);
   }
 
-  if (oneMinute.ok && mtf.ok) {
-    const mtfCount = Object.values(mtf.value).reduce(
-      (sum, count) => sum + Number(count),
-      0,
-    );
-    log(`📡 수집 완료 · 1m=${oneMinute.value} · MTF=${mtfCount}`);
+  if (oneMinute.ok && mtf.ok && futuresMtf.ok && initial) {
+    const spotCount = Object.values(mtf.value).reduce((sum, count) => sum + Number(count), 0);
+    const futuresCount = Object.values(futuresMtf.value).reduce((sum, count) => sum + Number(count), 0);
+    log(`📡 BOOT 동기화 · spot=${oneMinute.value + spotCount} · futures=${futuresCount}`);
   }
 }
 
 async function runNewsFundingCycle(): Promise<void> {
-  log("📰 News/Funding cycle 시작");
   await safeTask("뉴스 수집", () => collectBtcNews());
   await safeTask("뉴스 룰 분석", () => analyzePendingBtcNewsByRules(50));
   await safeTask("뉴스 점수", () => generateBtcNewsScore(24));
@@ -217,8 +223,6 @@ async function runCoreAnalysisCycle(): Promise<void> {
       );
     }
 
-    log("🧠 Core analysis cycle 시작");
-
     await safeTask("Technical", () => analyzeBtcTechnical());
     await safeTask("Regime V2", () => runMarketRegimeV2());
     await safeTask("Market Score", () => generateBtcMarketScore());
@@ -240,6 +244,22 @@ async function runCoreAnalysisCycle(): Promise<void> {
       );
     }
 
+    if (decisionResult.ok) {
+      const gate = await safeTask("Phase 8-4 Context Decision Gate", () => runPhase84ContextDecisionGate());
+      if (gate.ok) {
+        const g = gate.value;
+        log(`🚦 Context Gate · ${g.gatePermission.toUpperCase()} · ${g.alignment.toUpperCase()} · ${g.baseAction.toUpperCase()}→${g.shadowAction.toUpperCase()} · Δentry=${g.entryScoreDelta.toFixed(1)}`);
+      }
+    }
+
+    if (decisionResult.ok) {
+      const activation = await safeTask("Phase 8-5 Context Activation", () => runPhase85ContextActivation());
+      if (activation.ok) {
+        const a = activation.value;
+        log(`🟢 Context Activation · ${a.mode.toUpperCase()} · ${a.baseAction.toUpperCase()}→${a.effectiveAction.toUpperCase()} · permission=${a.effectiveTradingPermission.toUpperCase()} · applied=${a.applied}`);
+      }
+    }
+
     const phase7Audit = await safeTask("Phase 7 Pipeline Audit", () => runPhase7PipelineAudit());
     if (phase7Audit.ok && phase7Audit.value.status !== "healthy") {
       log(
@@ -256,9 +276,15 @@ async function runCoreAnalysisCycle(): Promise<void> {
       log(`💰 Adaptive Paper ${adaptivePaper.value.action} · ${adaptivePaper.value.reason}`);
     }
 
+    const contextOutcome = await safeTask("Phase 8-7 Context Execution Outcome", () => runPhase87ContextOutcome());
+    if (contextOutcome.ok && contextOutcome.value.status === "evaluated") {
+      const o = contextOutcome.value.result;
+      log(`📈 Context Outcome · ${o.label.toUpperCase()} · ${o.side.toUpperCase()} · return=${o.directionalReturnPercent.toFixed(3)}% · quality=${o.qualityScore.toFixed(0)}`);
+    }
+
     if (trackingStarted) await tracker.finish();
 
-    log(`✅ Core analysis 완료 · ${((Date.now() - started) / 1000).toFixed(1)}s`);
+
   } catch (error) {
     if (trackingStarted) {
       try {
@@ -272,11 +298,33 @@ async function runCoreAnalysisCycle(): Promise<void> {
 }
 
 async function runPerformanceCycle(): Promise<void> {
-  log("📊 Performance cycle 시작");
   await safeTask("Final Backtests", () => runFinalMarketBacktests());
   await safeTask("Performance Engine", () => runPerformanceEngine());
   await safeTask("V1/V2 Battle", () => runPerformanceBattle());
   await safeTask("Fixed vs Adaptive Battle", () => runFixedVsAdaptiveBattle());
+  const contextPerformance = await safeTask("Phase 8-8 Context Performance", () => runPhase88ContextPerformance());
+  if (contextPerformance.ok) {
+    const p = contextPerformance.value;
+    log(`📊 Context Performance · ${p.status.toUpperCase()} · sample=${p.sampleCount} · decisive=${p.decisiveSampleCount} · success=${p.successRate == null ? "-" : `${p.successRate.toFixed(1)}%`}`);
+
+    const promotion = await safeTask("Phase 8-9 Safety Promotion Gate", () => runPhase89SafetyPromotion());
+    if (promotion.ok) {
+      const g = promotion.value;
+      log(`🛡 Safety Promotion · ${g.status.toUpperCase()} · eligible=${g.eligible} · autoApply=${g.autoApplyAllowed}`);
+
+      const tuning = await safeTask("Phase 8-10 Adaptive Context Tuning", () => runPhase810AdaptiveContextTuning());
+      if (tuning.ok) {
+        const t = tuning.value;
+        log(`🧪 Context Tuning · ${t.status.toUpperCase()} · Δsuccess=${t.deltas.minimumSuccessRate} · Δquality=${t.deltas.minimumAverageQualityScore} · Δmargin=${t.deltas.cautionMarginMultiplier}`);
+
+        const rollback = await safeTask("Phase 8-11 Auto Rollback Protection", () => runPhase811AutoRollbackProtection());
+        if (rollback.ok) {
+          const r = rollback.value;
+          log(`↩ Context Rollback · ${r.status.toUpperCase()} · recommended=${r.rollbackRecommended} · auto=${r.autoRollbackAllowed}`);
+        }
+      }
+    }
+  }
   lastPerformanceAt = Date.now();
 }
 
@@ -286,6 +334,29 @@ async function runPipelineCycle(initial = false): Promise<void> {
   log(`──── Cycle #${cycleNumber} 시작${initial ? " (BOOT)" : ""} ────`);
 
   await collectContinuous(initial);
+
+  const structure = await safeTask("Phase 8-1 Market Structure", () => runPhase81MarketStructure());
+  if (structure.ok) {
+    const r = structure.value;
+    const s = r.nearestSupport, x = r.nearestResistance;
+    log(`🧱 S/R · $${r.currentPrice.toFixed(0)} · S=${s ? `$${s.price.toFixed(0)}/${s.strength}` : "-"} · R=${x ? `$${x.price.toFixed(0)}/${x.strength}` : "-"} · ${r.performance.totalMs}ms · RSS=${r.performance.rssMb}MB`);
+  }
+
+  const correlation = await safeTask("Phase 8-2 Market Correlation", () => runPhase82Correlation());
+  if (correlation.ok) {
+    const r = correlation.value;
+    log(`🔗 Correlation · ${r.state.toUpperCase()} · corr=${r.overallCorrelation.toFixed(3)} · divergence=${r.overallDivergenceScore.toFixed(0)} · risk=${r.riskLevel.toUpperCase()} · ${r.performance.totalMs}ms`);
+  }
+
+  if (structure.ok && correlation.ok) {
+    const context = await safeTask("Phase 8-3 Market Context", () =>
+      runPhase83MarketContext({ structure: structure.value, correlation: correlation.value }),
+    );
+    if (context.ok) {
+      const r = context.value;
+      log(`🧭 Context · ${r.permission.toUpperCase()} · ${r.preferredDirection.toUpperCase()} · score=${r.contextScore.toFixed(0)} · risk=${r.riskScore.toFixed(0)} · ${r.performance.totalMs}ms`);
+    }
+  }
 
   const now = Date.now();
   if (initial || now - lastNewsAt >= NEWS_INTERVAL_MS) {

@@ -60,7 +60,15 @@
     "phase7:audit:test": "tsx src/phase7-audit/Phase7PipelineAudit.test.ts",
     "phase7:audit:run": "tsx scripts/run-phase7-pipeline-audit.ts",
     "squeeze:opportunity:test": "tsx src/squeeze-opportunity/SqueezeOpportunityEngine.test.ts",
-    "squeeze:opportunity:run": "tsx scripts/run-squeeze-opportunity.ts"
+    "squeeze:opportunity:run": "tsx scripts/run-squeeze-opportunity.ts",
+    "phase8:structure:test": "tsx src/phase8-market-structure/Phase81MarketStructure.test.ts",
+    "phase8:structure:run": "tsx scripts/run-phase8-market-structure.ts",
+    "phase8:correlation:test": "tsx src/phase8-correlation/Phase82MarketCorrelation.test.ts",
+    "phase8:correlation:run": "tsx scripts/run-phase8-correlation.ts",
+    "phase8:context:test": "tsx src/phase8-context/Phase83MarketContext.test.ts",
+    "phase8:context:run": "tsx scripts/run-phase8-market-context.ts",
+    "phase8:decision-gate:test": "tsx src/phase8-decision-gate/Phase84ContextDecisionGate.test.ts",
+    "phase8:decision-gate:run": "tsx scripts/run-phase8-context-decision-gate.ts"
   },
   "keywords": [],
   "author": "",
