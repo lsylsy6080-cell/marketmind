@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { formatDateTime, formatRelativeTime } from "../format";
 import { DashboardRefreshControl } from "./DashboardRefreshControl";
 
-type ActivePage = "dashboard" | "futures" | "trading" | "project-center";
+type ActivePage = "dashboard" | "futures" | "trading" | "news" | "project-center";
 
 type MarketMindShellProps = {
   active: ActivePage;
@@ -14,8 +14,9 @@ type MarketMindShellProps = {
 
 const navItems = [
   { id: "dashboard" as const, href: "/", icon: "▦", label: "대시보드" },
-  { id: "futures" as const, href: "/futures", icon: "⇅", label: "선물 시장", badge: "NEW" },
+  { id: "futures" as const, href: "/futures", icon: "⇅", label: "선물 시장" },
   { id: "trading" as const, href: "/trading", icon: "◎", label: "모의 트레이딩" },
+  { id: "news" as const, href: "/news", icon: "◫", label: "뉴스" },
   { id: "project-center" as const, href: "/project-center", icon: "⬡", label: "프로젝트 센터" },
 ];
 
@@ -36,7 +37,7 @@ export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, chi
           {navItems.map((item) => (
             <Link key={item.id} href={item.href} className={active === item.id ? "active" : ""}>
               <i aria-hidden="true">{item.icon}</i>
-              <span>{item.label}</span>{"badge" in item && item.badge ? <b>{item.badge}</b> : null}
+              <span>{item.label}</span>
             </Link>
           ))}
           <span className="mm-nav-caption mm-nav-caption-secondary">INTELLIGENCE</span>

@@ -263,17 +263,11 @@ function mapStrategyPerformance(row: Record<string, unknown>): StrategyPerforman
   };
 }
 
-export async function getPaperTradingData(): Promise<PaperTradingData> {
+
+export async function getHomePaperTradingData(): Promise<PaperTradingData> {
   try {
     const supabase = createAdminClient();
-    const [
-      accountResult,
-      decisionsResult,
-      fundingResult,
-      backtestsResult,
-      performanceResult,
-      decisionV2Result,
-    ] = await Promise.all([
+    const [accountResult, decisionsResult, fundingResult, decisionV2Result] = await Promise.all([
       supabase
         .from("paper_trading_accounts")
         .select("*")
@@ -286,7 +280,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .select("*")
         .eq("symbol", "BTCUSDT")
         .order("decided_at", { ascending: false })
-        .limit(24),
+        .limit(3),
       supabase
         .from("funding_snapshots")
         .select("*")
@@ -294,18 +288,6 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .order("analyzed_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from("final_market_backtests")
-        .select("*")
-        .eq("symbol", "BTCUSDT")
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("final_market_performance")
-        .select("*")
-        .eq("symbol", "BTCUSDT")
-        .order("evaluated_at", { ascending: false })
-        .limit(200),
       supabase
         .from("ai_decision_v2_snapshots")
         .select("id,symbol,calculated_at,direction_score,market_trend_strength,direction_strength,final_score,final_confidence,direction,action,entry_quality_score,entry_quality,overheat_risk,reversal_risk,data_reliability,risk_level,trading_permission,preferred_entry,entry_plan,entry_trigger,strategy_version")
@@ -315,79 +297,156 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .maybeSingle(),
     ]);
 
-    const globalError = [
-      decisionsResult.error,
-      fundingResult.error,
-      backtestsResult.error,
-      performanceResult.error,
-      decisionV2Result.error,
-    ].find(Boolean);
-    if (globalError) throw globalError;
+    const firstError = [accountResult.error, decisionsResult.error, fundingResult.error, decisionV2Result.error].find(Boolean);
+    if (firstError) throw firstError;
 
     const decisionNumberKeys = [
-      "technical_score",
-      "technical_confidence",
-      "news_score",
-      "news_confidence",
-      "funding_score",
-      "funding_confidence",
-      "technical_weight",
-      "news_weight",
-      "funding_weight",
-      "final_score",
-      "final_confidence",
-      "conflict_score",
+      "technical_score", "technical_confidence", "news_score", "news_confidence",
+      "funding_score", "funding_confidence", "technical_weight", "news_weight",
+      "funding_weight", "final_score", "final_confidence", "conflict_score",
     ];
     const decisions = (decisionsResult.data ?? []).map((row) =>
       nullableNumericRow<FinalMarketDecision>(row, decisionNumberKeys),
     );
     const funding = fundingResult.data
       ? nullableNumericRow<FundingSnapshot>(fundingResult.data, [
-          "funding_rate",
-          "funding_rate_percent",
-          "annualized_rate",
-          "annualized_rate_percent",
-          "mark_price",
-          "index_price",
+          "funding_rate", "funding_rate_percent", "annualized_rate", "annualized_rate_percent",
+          "mark_price", "index_price",
         ])
       : null;
-    const backtests = (backtestsResult.data ?? []) as FinalMarketBacktest[];
-    const performance =
-      (performanceResult.data ?? []) as FinalMarketPerformance[];
     const decisionV2 = decisionV2Result.data
       ? nullableNumericRow<AiDecisionV2Snapshot>(decisionV2Result.data, [
-          "direction_score", "market_trend_strength", "direction_strength", "final_score", "final_confidence",
-          "entry_quality_score", "overheat_risk", "reversal_risk", "data_reliability",
+          "direction_score", "market_trend_strength", "direction_strength", "final_score",
+          "final_confidence", "entry_quality_score", "overheat_risk", "reversal_risk", "data_reliability",
         ])
       : null;
-    const globalData = {
-      decisions,
-      funding,
-      decisionV2,
-      backtestSummary: summarizeBacktests(backtests),
-      performanceSummary: summarizePerformance(performance),
-    };
 
-    if (accountResult.error) throw accountResult.error;
     if (!accountResult.data) {
       return {
         ...emptyPaperTradingData,
-        ...globalData,
-        decisionsById: Object.fromEntries(
-          decisions.map((decision) => [decision.id, decision]),
-        ),
+        decisions,
+        funding,
+        decisionV2,
+        decisionsById: Object.fromEntries(decisions.map((decision) => [decision.id, decision])),
       };
     }
 
     const accountId = Number(accountResult.data.id);
-    const [
-      configResult,
-      positionsResult,
-      ordersResult,
-      tradesResult,
-      runsResult,
-      equityResult,
-    ] = await Promise.all([
+    const positionsResult = await supabase
+      .from("paper_positions")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("status", "open")
+      .order("opened_at", { ascending: false })
+      .limit(5);
+
+    if (positionsResult.error) throw positionsResult.error;
+
+    const openPositions = (positionsResult.data ?? []).map((row) =>
+      numericRow<PaperPosition>(row, [
+        "id", "account_id", "opening_decision_id", "quantity", "entry_price", "exit_price",
+        "stop_loss_price", "take_profit_price", "entry_fee", "exit_fee", "realized_pnl", "realized_return_percent",
+      ]),
+    );
+
+    return {
+      ...emptyPaperTradingData,
+      account: numericRow<PaperTradingAccount>(accountResult.data, [
+        "id", "initial_balance", "cash_balance", "realized_pnl", "total_fees",
+      ]),
+      decisions,
+      funding,
+      decisionV2,
+      openPositions,
+      trades: [],
+      decisionsById: Object.fromEntries(decisions.map((decision) => [decision.id, decision])),
+      marketPrice: funding?.mark_price ?? openPositions[0]?.entry_price ?? null,
+    };
+  } catch (error: unknown) {
+    return {
+      ...emptyPaperTradingData,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function getPaperTradingData(): Promise<PaperTradingData> {
+  try {
+    const supabase = createAdminClient();
+
+    const [accountResult, decisionsResult, fundingResult, decisionV2Result] = await Promise.all([
+      supabase
+        .from("paper_trading_accounts")
+        .select("*")
+        .eq("is_active", true)
+        .order("id")
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("final_market_decisions")
+        .select("*")
+        .eq("symbol", "BTCUSDT")
+        .order("decided_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("funding_snapshots")
+        .select("*")
+        .eq("symbol", "BTCUSDT")
+        .order("analyzed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("ai_decision_v2_snapshots")
+        .select("id,symbol,calculated_at,direction_score,market_trend_strength,direction_strength,final_score,final_confidence,direction,action,entry_quality_score,entry_quality,overheat_risk,reversal_risk,data_reliability,risk_level,trading_permission,preferred_entry,entry_plan,entry_trigger,strategy_version")
+        .eq("symbol", "BTCUSDT")
+        .order("calculated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const firstError = [
+      accountResult.error,
+      decisionsResult.error,
+      fundingResult.error,
+      decisionV2Result.error,
+    ].find(Boolean);
+    if (firstError) throw firstError;
+
+    const decisionNumberKeys = [
+      "technical_score", "technical_confidence", "news_score", "news_confidence",
+      "funding_score", "funding_confidence", "technical_weight", "news_weight",
+      "funding_weight", "final_score", "final_confidence", "conflict_score",
+    ];
+
+    const decisions = (decisionsResult.data ?? []).map((row) =>
+      nullableNumericRow<FinalMarketDecision>(row, decisionNumberKeys),
+    );
+    const funding = fundingResult.data
+      ? nullableNumericRow<FundingSnapshot>(fundingResult.data, [
+          "funding_rate", "funding_rate_percent", "annualized_rate", "annualized_rate_percent",
+          "mark_price", "index_price",
+        ])
+      : null;
+    const decisionV2 = decisionV2Result.data
+      ? nullableNumericRow<AiDecisionV2Snapshot>(decisionV2Result.data, [
+          "direction_score", "market_trend_strength", "direction_strength", "final_score",
+          "final_confidence", "entry_quality_score", "overheat_risk", "reversal_risk", "data_reliability",
+        ])
+      : null;
+
+    if (!accountResult.data) {
+      return {
+        ...emptyPaperTradingData,
+        decisions,
+        funding,
+        decisionV2,
+        decisionsById: Object.fromEntries(decisions.map((decision) => [decision.id, decision])),
+      };
+    }
+
+    const accountId = Number(accountResult.data.id);
+
+    const [configResult, positionsResult, tradesResult, equityResult] = await Promise.all([
       supabase
         .from("paper_strategy_configs")
         .select("*")
@@ -402,48 +461,80 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .eq("account_id", accountId)
         .eq("status", "open")
         .order("opened_at", { ascending: false })
-        .limit(20),
-      supabase
-        .from("paper_orders")
-        .select("*")
-        .eq("account_id", accountId)
-        .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(5),
       supabase
         .from("paper_trades")
         .select("*")
         .eq("account_id", accountId)
         .order("closed_at", { ascending: false })
-        .limit(500),
-      supabase
-        .from("paper_strategy_runs")
-        .select("*")
-        .eq("account_id", accountId)
-        .order("created_at", { ascending: false })
-        .limit(20),
+        .limit(120),
       supabase
         .from("paper_equity_snapshots")
         .select("*")
         .eq("account_id", accountId)
-        .order("captured_at", { ascending: true })
-        .limit(180),
+        .order("captured_at", { ascending: false })
+        .limit(60),
     ]);
 
-    const firstError = [
+    const dataError = [
       configResult.error,
       positionsResult.error,
-      ordersResult.error,
       tradesResult.error,
-      runsResult.error,
       equityResult.error,
     ].find(Boolean);
-    if (firstError) throw firstError;
+    if (dataError) throw dataError;
+
+    const account = numericRow<PaperTradingAccount>(accountResult.data, [
+      "id", "initial_balance", "cash_balance", "realized_pnl", "total_fees",
+    ]);
+    const config = configResult.data
+      ? numericRow<PaperStrategyConfig>(configResult.data, [
+          "id", "account_id", "long_score_min", "short_score_max", "confidence_min",
+          "position_size_percent", "stop_loss_percent", "take_profit_percent",
+          "max_holding_minutes", "fee_rate_percent", "slippage_percent",
+        ])
+      : null;
+
+    const openPositions = (positionsResult.data ?? []).map((row) =>
+      numericRow<PaperPosition>(row, [
+        "id", "account_id", "opening_decision_id", "quantity", "entry_price", "exit_price",
+        "stop_loss_price", "take_profit_price", "entry_fee", "exit_fee", "realized_pnl",
+        "realized_return_percent",
+      ]),
+    );
+    const trades = (tradesResult.data ?? []).map((row) =>
+      numericRow<PaperTrade>(row, [
+        "id", "account_id", "position_id", "entry_price", "exit_price", "quantity",
+        "gross_pnl", "fees", "net_pnl", "return_percent",
+      ]),
+    );
+    const equity = [...(equityResult.data ?? [])].reverse().map((row) =>
+      numericRow<PaperEquitySnapshot>(row, [
+        "id", "account_id", "cash_balance", "unrealized_pnl", "equity", "market_price",
+      ]),
+    );
+
+    const decisionsById: Record<number, FinalMarketDecision> =
+      Object.fromEntries(decisions.map((decision) => [decision.id, decision]));
+    const referencedId = openPositions[0]?.opening_decision_id ?? null;
+
+    if (referencedId && !decisionsById[referencedId]) {
+      const referenced = await supabase
+        .from("final_market_decisions")
+        .select("*")
+        .eq("id", referencedId)
+        .maybeSingle();
+
+      if (!referenced.error && referenced.data) {
+        const decision = nullableNumericRow<FinalMarketDecision>(referenced.data, decisionNumberKeys);
+        decisionsById[decision.id] = decision;
+      }
+    }
 
     let strategyPerformance: StrategyPerformanceSnapshot | null = null;
-    const activeConfigId = configResult.data?.id ? Number(configResult.data.id) : null;
-
+    const activeConfigId = config?.id ?? null;
     if (activeConfigId !== null) {
-      const activePerformanceResult = await supabase
+      const performanceResult = await supabase
         .from("strategy_performance_snapshots")
         .select("*")
         .eq("strategy_config_id", activeConfigId)
@@ -451,171 +542,26 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .limit(1)
         .maybeSingle();
 
-      if (activePerformanceResult.error) throw activePerformanceResult.error;
-      if (activePerformanceResult.data) {
-        const mapped = mapStrategyPerformance(activePerformanceResult.data);
-        const hasV2Data =
-          mapped.average_holding_seconds !== null ||
-          mapped.side_performance.length > 0 ||
-          mapped.confidence_performance.length > 0 ||
-          mapped.exit_reason_performance.length > 0;
-        if (hasV2Data) strategyPerformance = mapped;
-      }
+      if (performanceResult.error) throw performanceResult.error;
+      if (performanceResult.data) strategyPerformance = mapStrategyPerformance(performanceResult.data);
     }
 
-    // 활성 전략에 아직 V2 스냅샷이 없더라도 패널이 사라지지 않도록
-    // 전체 전략 중 가장 최근에 생성된 V2 스냅샷을 fallback으로 사용합니다.
-    if (!strategyPerformance) {
-      const latestPerformanceResult = await supabase
-        .from("strategy_performance_snapshots")
-        .select("*")
-        .order("analyzed_at", { ascending: false })
-        .limit(20);
-
-      if (latestPerformanceResult.error) throw latestPerformanceResult.error;
-      const latestV2Row = (latestPerformanceResult.data ?? []).find((row) => {
-        const mapped = mapStrategyPerformance(row);
-        return (
-          mapped.average_holding_seconds !== null ||
-          mapped.side_performance.length > 0 ||
-          mapped.confidence_performance.length > 0 ||
-          mapped.exit_reason_performance.length > 0
-        );
-      });
-      if (latestV2Row) strategyPerformance = mapStrategyPerformance(latestV2Row);
-    }
-
-    const decisionIds = new Set<number>();
-    for (const position of positionsResult.data ?? []) {
-      if (position.opening_decision_id) {
-        decisionIds.add(Number(position.opening_decision_id));
-      }
-    }
-    for (const run of runsResult.data ?? []) {
-      if (run.decision_id) decisionIds.add(Number(run.decision_id));
-    }
-
-    const decisionsById: Record<number, FinalMarketDecision> =
-      Object.fromEntries(decisions.map((decision) => [decision.id, decision]));
-    const missingDecisionIds = [...decisionIds].filter(
-      (id) => !decisionsById[id],
-    );
-
-    if (missingDecisionIds.length > 0) {
-      const referencedResult = await supabase
-        .from("final_market_decisions")
-        .select("*")
-        .in("id", missingDecisionIds);
-
-      if (!referencedResult.error) {
-        for (const row of referencedResult.data ?? []) {
-          const decision = nullableNumericRow<FinalMarketDecision>(
-            row,
-            decisionNumberKeys,
-          );
-          decisionsById[decision.id] = decision;
-        }
-      }
-    }
-
-    const account = numericRow<PaperTradingAccount>(accountResult.data, [
-      "id",
-      "initial_balance",
-      "cash_balance",
-      "realized_pnl",
-      "total_fees",
-    ]);
-    const config = configResult.data
-      ? numericRow<PaperStrategyConfig>(configResult.data, [
-          "id",
-          "account_id",
-          "long_score_min",
-          "short_score_max",
-          "confidence_min",
-          "position_size_percent",
-          "stop_loss_percent",
-          "take_profit_percent",
-          "max_holding_minutes",
-          "fee_rate_percent",
-          "slippage_percent",
-        ])
-      : null;
-    const openPositions = (positionsResult.data ?? []).map((row) =>
-      numericRow<PaperPosition>(row, [
-        "id",
-        "account_id",
-        "opening_decision_id",
-        "quantity",
-        "entry_price",
-        "exit_price",
-        "stop_loss_price",
-        "take_profit_price",
-        "entry_fee",
-        "exit_fee",
-        "realized_pnl",
-        "realized_return_percent",
-      ]),
-    );
-    const orders = (ordersResult.data ?? []).map((row) =>
-      numericRow<PaperOrder>(row, [
-        "id",
-        "account_id",
-        "decision_id",
-        "requested_price",
-        "executed_price",
-        "quantity",
-        "notional",
-        "fee",
-      ]),
-    );
-    const trades = (tradesResult.data ?? []).map((row) =>
-      numericRow<PaperTrade>(row, [
-        "id",
-        "account_id",
-        "position_id",
-        "entry_price",
-        "exit_price",
-        "quantity",
-        "gross_pnl",
-        "fees",
-        "net_pnl",
-        "return_percent",
-      ]),
-    );
-    const runs = (runsResult.data ?? []).map((row) =>
-      numericRow<PaperStrategyRun>(row, [
-        "id",
-        "account_id",
-        "decision_id",
-        "market_price",
-      ]),
-    );
-    const equity = (equityResult.data ?? []).map((row) =>
-      numericRow<PaperEquitySnapshot>(row, [
-        "id",
-        "account_id",
-        "cash_balance",
-        "unrealized_pnl",
-        "equity",
-        "market_price",
-      ]),
-    );
     const marketPrice =
-      runs.find((run) => run.market_price)?.market_price ??
       equity.at(-1)?.market_price ??
       funding?.mark_price ??
       openPositions[0]?.entry_price ??
       null;
 
     return {
+      ...emptyPaperTradingData,
       account,
       config,
-      ...globalData,
+      decisions,
+      funding,
+      decisionV2,
       strategyPerformance,
       openPositions,
-      orders,
       trades,
-      runs,
       equity,
       decisionsById,
       marketPrice,

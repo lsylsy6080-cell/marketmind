@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
   CrosshairMode,
   LineSeries,
   createChart,
-  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
-  type ISeriesMarkersPluginApi,
-  type SeriesMarker,
-  type Time,
   type UTCTimestamp,
   LineStyle,
 } from "lightweight-charts";
@@ -23,14 +19,6 @@ import { calculateLivePositionMetrics } from "../live-position";
 type Interval = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
 type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
 type KlinePayload = { e?: string; k?: { t: number; o: string; h: string; l: string; c: string; v: string } };
-type TradeEntryMarker = { opened_at: string; side: "long" | "short"; entry_price: number };
-type TradeExitMarker = {
-  closed_at: string;
-  side: "long" | "short";
-  exit_price: number;
-  return_percent: number;
-  close_reason: string;
-};
 
 const intervals: { value: Interval; label: string }[] = [
   { value: "1m", label: "1분" },
@@ -62,43 +50,28 @@ function toChartCandle(candle: Candle) {
   };
 }
 
-function nearestCandleTime(candles: Candle[], timestamp: number) {
-  if (!candles.length) return null;
-  let best = candles[0];
-  let distance = Math.abs(best.time - timestamp);
-  for (const candle of candles) {
-    const nextDistance = Math.abs(candle.time - timestamp);
-    if (nextDistance < distance) {
-      best = candle;
-      distance = nextDistance;
-    }
-  }
-  return best.time as UTCTimestamp;
-}
 
-type LiveBitcoinChartProps = {
-  entries?: TradeEntryMarker[];
-  exits?: TradeExitMarker[];
-  positions?: PaperPosition[];
-};
+type LiveBitcoinChartProps = { positions?: PaperPosition[]; };
 
 function signed(value: number, digits = 2) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
 }
 
-export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: LiveBitcoinChartProps) {
+export function LiveBitcoinChart({ positions = [] }: LiveBitcoinChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const ema20SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema60SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema120SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-  const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const entryPriceLineRef = useRef<IPriceLine | null>(null);
+  const stopPriceLineRef = useRef<IPriceLine | null>(null);
+  const takePriceLineRef = useRef<IPriceLine | null>(null);
   const candlesRef = useRef<Candle[]>([]);
   const loadingOlderRef = useRef(false);
   const hasMoreHistoryRef = useRef(true);
   const intervalRef = useRef<Interval>("1m");
+  const lastUiRefreshRef = useRef(0);
 
   const [interval, setIntervalValue] = useState<Interval>("1m");
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -164,7 +137,6 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
     ema20SeriesRef.current = ema20Series;
     ema60SeriesRef.current = ema60Series;
     ema120SeriesRef.current = ema120Series;
-    markerPluginRef.current = createSeriesMarkers(candleSeries, []);
 
     const resizeObserver = new ResizeObserver(() => {
       if (!containerRef.current) return;
@@ -174,8 +146,9 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
 
     return () => {
       resizeObserver.disconnect();
-      markerPluginRef.current = null;
       entryPriceLineRef.current = null;
+      stopPriceLineRef.current = null;
+      takePriceLineRef.current = null;
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -253,7 +226,7 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
     };
 
     async function loadInitialHistory() {
-      const MAX_INITIAL_CANDLES = 5000;
+      const MAX_INITIAL_CANDLES = 1000;
       const PAGE_SIZE = 1000;
       let endTime: number | null = null;
       let all: Candle[] = [];
@@ -267,7 +240,7 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
         });
         if (endTime != null) params.set("endTime", String(endTime));
 
-        const response = await fetch(`/api/market-chart?${params.toString()}&_=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch(`/api/market-chart?${params.toString()}`);
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error ?? "차트 데이터 오류");
 
@@ -300,7 +273,7 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
         setCandles(history);
         hasMoreHistoryRef.current = initial.hasMore;
         applyAllSeries(history);
-        // Phase 7-6.4: 최대 5,000개 과거 캔들을 최초에 로드하고 전체 구간을 한 화면에 맞춥니다.
+        // 초기에는 최근 1,000개 캔들만 빠르게 로드하고, 왼쪽 이동 시 과거 데이터를 추가합니다.
         // 이후 확대하거나 왼쪽으로 이동하면 기존 무한 과거 로딩도 계속 사용할 수 있습니다.
         chartRef.current?.timeScale().fitContent();
       } catch (e) {
@@ -319,24 +292,26 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
       const applyIncoming = (incoming: Candle[]) => {
         if (!incoming.length || disposed || intervalRef.current !== interval) return;
 
-        setCandles((current) => {
-          const mergedMap = new Map<number, Candle>();
-          for (const candle of current) mergedMap.set(candle.time, candle);
-          for (const candle of incoming) mergedMap.set(candle.time, candle);
-          const merged = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+        const mergedMap = new Map<number, Candle>();
+        for (const candle of candlesRef.current) mergedMap.set(candle.time, candle);
+        for (const candle of incoming) mergedMap.set(candle.time, candle);
+        const merged = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+        candlesRef.current = merged;
 
-          candlesRef.current = merged;
-          const latestCandle = merged[merged.length - 1];
-          if (latestCandle) candleSeriesRef.current?.update(toChartCandle(latestCandle));
+        const latestCandle = merged[merged.length - 1];
+        if (latestCandle) candleSeriesRef.current?.update(toChartCandle(latestCandle));
 
+        const now = Date.now();
+        if (now - lastUiRefreshRef.current >= 1000) {
+          lastUiRefreshRef.current = now;
           const e20 = emaData(merged, 20);
           const e60 = emaData(merged, 60);
           const e120 = emaData(merged, 120);
           if (e20.length) ema20SeriesRef.current?.update(e20[e20.length - 1]);
           if (e60.length) ema60SeriesRef.current?.update(e60[e60.length - 1]);
           if (e120.length) ema120SeriesRef.current?.update(e120[e120.length - 1]);
-          return merged;
-        });
+          setCandles(merged);
+        }
       };
 
       // Paper Trading에서 사용하는 것과 같은 Binance USDⓈ-M Futures WebSocket 계열을 사용합니다.
@@ -446,11 +421,16 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
     const series = candleSeriesRef.current;
     if (!series) return;
 
-    if (entryPriceLineRef.current) {
-      series.removePriceLine(entryPriceLineRef.current);
+    const removeLines = () => {
+      if (entryPriceLineRef.current) series.removePriceLine(entryPriceLineRef.current);
+      if (stopPriceLineRef.current) series.removePriceLine(stopPriceLineRef.current);
+      if (takePriceLineRef.current) series.removePriceLine(takePriceLineRef.current);
       entryPriceLineRef.current = null;
-    }
+      stopPriceLineRef.current = null;
+      takePriceLineRef.current = null;
+    };
 
+    removeLines();
     if (!primaryPosition) return;
 
     const isLong = primaryPosition.side === "long";
@@ -460,74 +440,27 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
       lineWidth: 2,
       lineStyle: LineStyle.Dashed,
       axisLabelVisible: true,
-      title: `${isLong ? "LONG" : "SHORT"} ENTRY`,
+      title: "ENTRY",
+    });
+    stopPriceLineRef.current = series.createPriceLine({
+      price: primaryPosition.stop_loss_price,
+      color: "#ef5350",
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "SL",
+    });
+    takePriceLineRef.current = series.createPriceLine({
+      price: primaryPosition.take_profit_price,
+      color: "#22c55e",
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: "TP",
     });
 
-    return () => {
-      if (entryPriceLineRef.current && candleSeriesRef.current) {
-        candleSeriesRef.current.removePriceLine(entryPriceLineRef.current);
-        entryPriceLineRef.current = null;
-      }
-    };
+    return removeLines;
   }, [primaryPosition]);
-
-  const markers = useMemo(() => {
-    if (!candles.length) return [] as SeriesMarker<Time>[];
-    const first = candles[0].time;
-    const last = candles[candles.length - 1].time;
-
-    const entryMarkers = entries
-      .slice(0, 300)
-      .flatMap((entry): SeriesMarker<Time>[] => {
-        const timestamp = Math.floor(new Date(entry.opened_at).getTime() / 1000);
-        if (!Number.isFinite(timestamp) || timestamp < first || timestamp > last) return [];
-        const time = nearestCandleTime(candles, timestamp);
-        if (time == null) return [];
-        const isLong = entry.side === "long";
-        return [{
-          time,
-          position: isLong ? "belowBar" : "aboveBar",
-          color: isLong ? "#22c55e" : "#ef5350",
-          shape: isLong ? "arrowUp" : "arrowDown",
-          text: `${isLong ? "LONG" : "SHORT"} ENTRY`,
-        }];
-      });
-
-    const exitMarkers = exits
-      .slice(0, 300)
-      .flatMap((exit): SeriesMarker<Time>[] => {
-        const timestamp = Math.floor(new Date(exit.closed_at).getTime() / 1000);
-        if (!Number.isFinite(timestamp) || timestamp < first || timestamp > last) return [];
-        const time = nearestCandleTime(candles, timestamp);
-        if (time == null) return [];
-
-        const isLong = exit.side === "long";
-        const profitable = Number(exit.return_percent) >= 0;
-        const reason = String(exit.close_reason ?? "").toLowerCase();
-        const reasonLabel =
-          reason.includes("take_profit") || reason.includes("tp") ? "TP" :
-          reason.includes("stop_loss") || reason.includes("sl") ? "SL" :
-          reason.includes("max_holding") || reason.includes("time") ? "TIME" :
-          reason.includes("trailing") ? "TRAIL" :
-          reason.includes("break_even") ? "BE" : "EXIT";
-
-        return [{
-          time,
-          // LONG 청산은 매도이므로 위쪽 ↓, SHORT 청산은 매수이므로 아래쪽 ↑
-          position: isLong ? "aboveBar" : "belowBar",
-          color: profitable ? "#38d39f" : "#ff7185",
-          shape: isLong ? "arrowDown" : "arrowUp",
-          text: `${isLong ? "LONG" : "SHORT"} ${reasonLabel} ${signed(Number(exit.return_percent), 2)}%`,
-        }];
-      });
-
-    return [...entryMarkers, ...exitMarkers]
-      .sort((a, b) => Number(a.time) - Number(b.time));
-  }, [candles, entries, exits]);
-
-  useEffect(() => {
-    markerPluginRef.current?.setMarkers(markers);
-  }, [markers]);
 
   const latest = candles[candles.length - 1] ?? null;
   const firstVisible = candles[Math.max(0, candles.length - 96)] ?? null;
@@ -562,7 +495,7 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
         <span className="ema20-label">EMA 20</span>
         <span className="ema60-label">EMA 60</span>
         <span className="ema120-label">EMA 120</span>
-        <small>{loadingOlder ? "과거 캔들 불러오는 중…" : "최대 5,000개 과거 캔들 초기 로딩 · 진입/청산 타점 표시 · 왼쪽 추가 로딩 지원"}</small>
+        <small>{loadingOlder ? "과거 캔들 불러오는 중…" : "최근 1,000개 우선 로딩 · 현재 포지션 ENTRY / SL / TP · 왼쪽 추가 로딩 지원"}</small>
       </div>
 
       {primaryPosition && latest && liveMetrics ? (
@@ -605,7 +538,7 @@ export function LiveBitcoinChart({ entries = [], exits = [], positions = [] }: L
 
       <div ref={containerRef} className="tradingview-chart-container" aria-label={`BTCUSDT ${interval} TradingView 실시간 캔들 차트`} />
       <div className="chart-footnote">
-        Binance USDⓈ-M Futures WebSocket 실시간 데이터 · Paper Trading ENTRY / EXIT 마커 · 연결 실패 시 Supabase 자동 fallback · Charting technology by TradingView Lightweight Charts™
+        Binance USDⓈ-M Futures WebSocket 실시간 데이터 · 현재 포지션 ENTRY / SL / TP 표시 · 연결 실패 시 Supabase 자동 fallback · Charting technology by TradingView Lightweight Charts™
       </div>
     </section>
   );
