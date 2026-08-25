@@ -1,1 +1,1 @@
-src\news\NewsSchedule.test.ts
+src\news\NewsLocalTranslationConfig.test.ts

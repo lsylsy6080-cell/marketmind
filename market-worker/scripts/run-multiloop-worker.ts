@@ -201,7 +201,7 @@ async function runNewsFundingCycle(): Promise<void> {
   await safeTask("뉴스 수집", () => collectBtcNews());
   await safeTask("뉴스 룰 분석", () => analyzePendingBtcNewsByRules(50));
   await safeTask("뉴스 사건 중복 정리", () => markRecentNewsDuplicates(48));
-  await safeTask("뉴스 한국어 속보 편집", () => editPendingNewsToKorean(20));
+  await safeTask("뉴스 한국어 속보 편집", () => editPendingNewsToKorean(5));
   await safeTask("뉴스 점수", () => generateBtcNewsScore(24));
   await safeTask("뉴스 인텔리전스", () => enrichLatestBtcNewsScore());
   await safeTask("Funding snapshot", () => generateBtcFundingSnapshot());
