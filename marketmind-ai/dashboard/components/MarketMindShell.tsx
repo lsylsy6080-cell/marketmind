@@ -56,6 +56,26 @@ export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, chi
 
       <section className="mm-workspace">
         <header className="mm-brand-hero">
+          <details className="mm-mobile-menu">
+            <summary aria-label="전체 메뉴 열기"><span aria-hidden="true">☰</span></summary>
+            <div className="mm-mobile-menu-backdrop" />
+            <nav className="mm-mobile-menu-drawer" aria-label="MarketMind 모바일 전체 메뉴">
+              <div className="mm-mobile-menu-head">
+                <img src="/marketmind-logo.svg" alt="" />
+                <div><strong>MarketMind <em>AI</em></strong><span>전체 메뉴</span></div>
+              </div>
+              <span className="mm-mobile-menu-caption">MAIN</span>
+              {navItems.map((item) => (
+                <Link key={`mobile-${item.id}`} href={item.href} className={active === item.id ? "active" : ""}>
+                  <i aria-hidden="true">{item.icon}</i><span>{item.label}</span><b aria-hidden="true">›</b>
+                </Link>
+              ))}
+              <span className="mm-mobile-menu-caption secondary">INTELLIGENCE</span>
+              <div className="mm-mobile-menu-info"><i>◉</i><span>AI 분석</span><b>LIVE</b></div>
+              <div className="mm-mobile-menu-info"><i>↗</i><span>시장 데이터</span><b>BTC</b></div>
+            </nav>
+          </details>
+
           <Link href="/" className="mm-hero-brand" aria-label="MarketMind AI 홈">
             <img src="/marketmind-logo.svg" alt="" />
             <div>
