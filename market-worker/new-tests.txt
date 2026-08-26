@@ -1,1 +1,1 @@
-src\news\NewsLocalTranslationConfig.test.ts
+src\etf-price-response\EtfFlowPriceResponseAnalyzer.test.ts

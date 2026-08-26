@@ -201,7 +201,7 @@ async function runNewsFundingCycle(): Promise<void> {
   await safeTask("뉴스 수집", () => collectBtcNews());
   await safeTask("뉴스 룰 분석", () => analyzePendingBtcNewsByRules(50));
   await safeTask("뉴스 사건 중복 정리", () => markRecentNewsDuplicates(48));
-  await safeTask("뉴스 한국어 속보 편집", () => editPendingNewsToKorean(5));
+  await safeTask("뉴스 한국어 속보 편집", () => editPendingNewsToKorean(30));
   await safeTask("뉴스 점수", () => generateBtcNewsScore(24));
   await safeTask("뉴스 인텔리전스", () => enrichLatestBtcNewsScore());
   await safeTask("Funding snapshot", () => generateBtcFundingSnapshot());
@@ -392,6 +392,12 @@ async function main(): Promise<void> {
   try {
     // 부팅 시 과거 데이터부터 충분히 동기화한 뒤 분석 시작
     await runPipelineCycle(true);
+
+    // BAT의 전체 1회 RUN 모드: BOOT Cycle #1 완료 후 자동 종료합니다.
+    if (process.env.WORKER_RUN_ONCE === "true") {
+      log("1회 RUN 모드 완료 · Cycle #1 종료 후 자동 종료");
+      return;
+    }
 
     while (!stopping) {
       const nextAt =

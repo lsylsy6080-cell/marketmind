@@ -71,7 +71,9 @@
     "phase8:decision-gate:run": "tsx scripts/run-phase8-context-decision-gate.ts",
     "news:pipeline:run": "tsx scripts/run-news-pipeline-v1.ts",
     "news:pipeline:test": "tsx src/news/NewsPipelineV1.test.ts",
-    "news:translation:check": "node -e \"import('@huggingface/transformers').then(()=>console.log('[PASS] local translator package installed')).catch(()=>{console.error('[FAIL] run npm install first');process.exit(1)})\""
+    "runner:full-once": "tsx scripts/run-multiloop-worker.ts",
+    "etf:response:run": "tsx scripts/run-etf-price-response.ts",
+    "etf:response:test": "tsx src/etf-price-response/EtfFlowPriceResponseAnalyzer.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -82,8 +84,7 @@
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "rss-parser": "^3.13.0",
-    "ws": "^8.18.3",
-    "@huggingface/transformers": "^3.7.2"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
