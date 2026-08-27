@@ -71,6 +71,7 @@ export function LiveBitcoinChart({positions=[]}:{positions?:PaperPosition[]}){
  const tenkanRef=useRef<ISeriesApi<"Line">|null>(null),kijunRef=useRef<ISeriesApi<"Line">|null>(null),spanARef=useRef<ISeriesApi<"Line">|null>(null),spanBRef=useRef<ISeriesApi<"Line">|null>(null),volumeRef=useRef<ISeriesApi<"Histogram">|null>(null);
  const entryRef=useRef<IPriceLine|null>(null),stopRef=useRef<IPriceLine|null>(null),takeRef=useRef<IPriceLine|null>(null),supportRef=useRef<IPriceLine|null>(null),resistanceRef=useRef<IPriceLine|null>(null);const markerApiRef=useRef<ISeriesMarkersPluginApi<Time>|null>(null);
  const candlesRef=useRef<Candle[]>([]),loadingOlderRef=useRef(false),hasMoreRef=useRef(true),intervalRef=useRef<Interval>("1d"),lastUiRefreshRef=useRef(0);
+ const chartDisposedRef=useRef(true),cloudRafRef=useRef<number|null>(null);
  const [interval,setIntervalValue]=useState<Interval>("1d"),[candles,setCandles]=useState<Candle[]>([]),[status,setStatus]=useState<"loading"|"live"|"reconnecting"|"error">("loading"),[error,setError]=useState<string|null>(null),[loadingOlder,setLoadingOlder]=useState(false);
  const [overlays,setOverlays]=useState<Record<OverlayKey,boolean>>({ema:false,ichimoku:true,structure:true,sr:true,volume:true});
  const [viewMode,setViewMode]=useState<ViewMode>("trend");
@@ -98,29 +99,71 @@ export function LiveBitcoinChart({positions=[]}:{positions?:PaperPosition[]}){
 
  useEffect(()=>{let dead=false;(async()=>{try{const [w,d,h4]=await Promise.all([fetchMany("1w",700),fetchMany("1d",1800),fetchMany("4h",1600)]);if(dead)return;setContexts({w:w.candles.length?analyzeLongTermTrend(w.candles,'1w'):null,d:d.candles.length?analyzeLongTermTrend(d.candles,'1d'):null,h4:h4.candles.length?analyzeLongTermTrend(h4.candles,'4h'):null})}catch(e){console.warn("[장기추세] 멀티타임프레임 로드 실패",e)}})();return()=>{dead=true}},[]);
 
+ function scheduleCloudDraw(history:Candle[]=candlesRef.current){
+  if(chartDisposedRef.current)return;
+  if(cloudRafRef.current!=null)cancelAnimationFrame(cloudRafRef.current);
+  cloudRafRef.current=requestAnimationFrame(()=>{
+   cloudRafRef.current=null;
+   if(chartDisposedRef.current)return;
+   drawIchimokuCloud(history);
+  });
+ }
+
+ function activeTimeScale(chart:IChartApi|null){
+  if(!chart||chartDisposedRef.current||chartRef.current!==chart)return null;
+  try{return chart.timeScale()}catch{return null}
+ }
+
  useEffect(()=>{
-  if(!containerRef.current)return;const container=containerRef.current;const chart=createChart(container,{width:container.clientWidth,height:640,layout:{background:{type:ColorType.Solid,color:"#0b1020"},textColor:"#8892a8",attributionLogo:true},grid:{vertLines:{color:"rgba(148,163,184,.07)"},horzLines:{color:"rgba(148,163,184,.07)"}},crosshair:{mode:CrosshairMode.Normal,vertLine:{color:"rgba(148,163,184,.42)",labelBackgroundColor:"#334155"},horzLine:{color:"rgba(148,163,184,.42)",labelBackgroundColor:"#334155"}},rightPriceScale:{borderColor:"rgba(148,163,184,.16)",scaleMargins:{top:.07,bottom:.23}},timeScale:{borderColor:"rgba(148,163,184,.16)",timeVisible:true,secondsVisible:false,rightOffset:8,barSpacing:5},handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true}});
+  if(!containerRef.current)return;chartDisposedRef.current=false;const container=containerRef.current;const chart=createChart(container,{width:container.clientWidth,height:640,layout:{background:{type:ColorType.Solid,color:"#0b1020"},textColor:"#8892a8",attributionLogo:true},grid:{vertLines:{color:"rgba(148,163,184,.07)"},horzLines:{color:"rgba(148,163,184,.07)"}},crosshair:{mode:CrosshairMode.Normal,vertLine:{color:"rgba(148,163,184,.42)",labelBackgroundColor:"#334155"},horzLine:{color:"rgba(148,163,184,.42)",labelBackgroundColor:"#334155"}},rightPriceScale:{borderColor:"rgba(148,163,184,.16)",scaleMargins:{top:.07,bottom:.23}},timeScale:{borderColor:"rgba(148,163,184,.16)",timeVisible:true,secondsVisible:false,rightOffset:8,barSpacing:5},handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true}});
   const candle=chart.addSeries(CandlestickSeries,{upColor:"#26a69a",downColor:"#ef5350",borderVisible:false,wickUpColor:"#26a69a",wickDownColor:"#ef5350",priceLineVisible:true,lastValueVisible:true});
   ema20Ref.current=chart.addSeries(LineSeries,{color:"#22c55e",lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});ema50Ref.current=chart.addSeries(LineSeries,{color:"#38bdf8",lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});ema100Ref.current=chart.addSeries(LineSeries,{color:"#f59e0b",lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});ema200Ref.current=chart.addSeries(LineSeries,{color:"#d946ef",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   tenkanRef.current=chart.addSeries(LineSeries,{color:"#2196f3",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});kijunRef.current=chart.addSeries(LineSeries,{color:"#ff9800",lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});spanARef.current=chart.addSeries(LineSeries,{color:"rgba(76,175,80,.78)",lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});spanBRef.current=chart.addSeries(LineSeries,{color:"rgba(239,83,80,.72)",lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
   volumeRef.current=chart.addSeries(HistogramSeries,{priceScaleId:"volume",priceFormat:{type:"volume"},lastValueVisible:false,priceLineVisible:false});chart.priceScale("volume").applyOptions({scaleMargins:{top:.82,bottom:0}});
   chartRef.current=chart;candleSeriesRef.current=candle;markerApiRef.current=createSeriesMarkers(candle,[] as SeriesMarker<Time>[]);
-  const ro=new ResizeObserver(()=>{if(containerRef.current)chart.applyOptions({width:containerRef.current.clientWidth})});ro.observe(container);return()=>{ro.disconnect();chart.remove();chartRef.current=null;candleSeriesRef.current=null;markerApiRef.current=null}
+  const ro=new ResizeObserver(()=>{
+   if(chartDisposedRef.current||chartRef.current!==chart||!containerRef.current)return;
+   try{chart.applyOptions({width:containerRef.current.clientWidth})}catch{}
+  });
+  ro.observe(container);
+  return()=>{
+   chartDisposedRef.current=true;
+   ro.disconnect();
+   if(cloudRafRef.current!=null){cancelAnimationFrame(cloudRafRef.current);cloudRafRef.current=null}
+   // 다른 effect가 disposed series를 잡지 않도록 ref를 먼저 비웁니다.
+   chartRef.current=null;candleSeriesRef.current=null;markerApiRef.current=null;
+   ema20Ref.current=null;ema50Ref.current=null;ema100Ref.current=null;ema200Ref.current=null;
+   tenkanRef.current=null;kijunRef.current=null;spanARef.current=null;spanBRef.current=null;volumeRef.current=null;
+   entryRef.current=null;stopRef.current=null;takeRef.current=null;supportRef.current=null;resistanceRef.current=null;
+   try{chart.remove()}catch{}
+  }
  },[]);
 
  function applyAll(history:Candle[]){
-  candleSeriesRef.current?.setData(history.map(toChartCandle));ema20Ref.current?.setData(emaData(history,20).map(x=>({time:x.time as UTCTimestamp,value:x.value})));ema50Ref.current?.setData(emaData(history,50).map(x=>({time:x.time as UTCTimestamp,value:x.value})));ema100Ref.current?.setData(emaData(history,100).map(x=>({time:x.time as UTCTimestamp,value:x.value})));ema200Ref.current?.setData(emaData(history,200).map(x=>({time:x.time as UTCTimestamp,value:x.value})));
-  const ichi=ichimokuSeries(history);const step=history.length>1?Math.max(60,history[1].time-history[0].time):3600;tenkanRef.current?.setData(ichi.filter(x=>x.conversion!=null).map(x=>({time:x.time as UTCTimestamp,value:x.conversion!})));kijunRef.current?.setData(ichi.filter(x=>x.base!=null).map(x=>({time:x.time as UTCTimestamp,value:x.base!})));spanARef.current?.setData(ichi.filter(x=>x.spanA!=null).map(x=>({time:(x.time+26*step) as UTCTimestamp,value:x.spanA!})));spanBRef.current?.setData(ichi.filter(x=>x.spanB!=null).map(x=>({time:(x.time+26*step) as UTCTimestamp,value:x.spanB!})));
-  volumeRef.current?.setData(history.map(x=>({time:x.time as UTCTimestamp,value:x.volume,color:x.close>=x.open?"rgba(38,166,154,.42)":"rgba(239,83,80,.38)"})));
-  requestAnimationFrame(()=>drawIchimokuCloud(history));
+  if(chartDisposedRef.current)return;
+  try{
+   candleSeriesRef.current?.setData(history.map(toChartCandle));ema20Ref.current?.setData(emaData(history,20).map(x=>({time:x.time as UTCTimestamp,value:x.value})));ema50Ref.current?.setData(emaData(history,50).map(x=>({time:x.time as UTCTimestamp,value:x.value})));ema100Ref.current?.setData(emaData(history,100).map(x=>({time:x.time as UTCTimestamp,value:x.value})));ema200Ref.current?.setData(emaData(history,200).map(x=>({time:x.time as UTCTimestamp,value:x.value})));
+   const ichi=ichimokuSeries(history);const step=history.length>1?Math.max(60,history[1].time-history[0].time):3600;tenkanRef.current?.setData(ichi.filter(x=>x.conversion!=null).map(x=>({time:x.time as UTCTimestamp,value:x.conversion!})));kijunRef.current?.setData(ichi.filter(x=>x.base!=null).map(x=>({time:x.time as UTCTimestamp,value:x.base!})));spanARef.current?.setData(ichi.filter(x=>x.spanA!=null).map(x=>({time:(x.time+26*step) as UTCTimestamp,value:x.spanA!})));spanBRef.current?.setData(ichi.filter(x=>x.spanB!=null).map(x=>({time:(x.time+26*step) as UTCTimestamp,value:x.spanB!})));
+   volumeRef.current?.setData(history.map(x=>({time:x.time as UTCTimestamp,value:x.volume,color:x.close>=x.open?"rgba(38,166,154,.42)":"rgba(239,83,80,.38)"})));
+   scheduleCloudDraw(history);
+  }catch(e){
+   if(!chartDisposedRef.current)console.warn("[장기추세] 차트 데이터 반영 실패",e);
+  }
  }
 
  function drawIchimokuCloud(history:Candle[]){
+  if(chartDisposedRef.current)return;
   const canvas=cloudCanvasRef.current,chart=chartRef.current,series=candleSeriesRef.current;if(!canvas||!chart||!series)return;
   const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;canvas.width=Math.max(1,Math.floor(rect.width*dpr));canvas.height=Math.max(1,Math.floor(rect.height*dpr));
   const ctx=canvas.getContext("2d");if(!ctx)return;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);if(!overlays.ichimoku||history.length<60)return;
   const ichi=ichimokuSeries(history),step=history.length>1?Math.max(60,history[1].time-history[0].time):3600;
-  const pts=ichi.filter(x=>x.spanA!=null&&x.spanB!=null).map(x=>{const time=(x.time+26*step) as UTCTimestamp;return {x:chart.timeScale().timeToCoordinate(time),a:series.priceToCoordinate(x.spanA!),b:series.priceToCoordinate(x.spanB!),bull:x.spanA!>=x.spanB!}}).filter((p):p is {x:Coordinate;a:Coordinate;b:Coordinate;bull:boolean}=>p.x!=null&&p.a!=null&&p.b!=null);
+  let pts:{x:Coordinate;a:Coordinate;b:Coordinate;bull:boolean}[]=[];
+  try{
+   const timeScale=chart.timeScale();
+   pts=ichi.filter(x=>x.spanA!=null&&x.spanB!=null).map(x=>{const time=(x.time+26*step) as UTCTimestamp;return {x:timeScale.timeToCoordinate(time),a:series.priceToCoordinate(x.spanA!),b:series.priceToCoordinate(x.spanB!),bull:x.spanA!>=x.spanB!}}).filter((p):p is {x:Coordinate;a:Coordinate;b:Coordinate;bull:boolean}=>p.x!=null&&p.a!=null&&p.b!=null);
+  }catch{
+   return;
+  }
   if(pts.length<2)return;
   let start=0;
   for(let i=1;i<=pts.length;i++){const boundary=i===pts.length||pts[i].bull!==pts[start].bull;if(!boundary)continue;const seg=pts.slice(start,i);if(seg.length>=2){ctx.beginPath();ctx.moveTo(seg[0].x,seg[0].a);for(const p of seg.slice(1))ctx.lineTo(p.x,p.a);for(const p of [...seg].reverse())ctx.lineTo(p.x,p.b);ctx.closePath();ctx.fillStyle=seg[0].bull?"rgba(76,175,80,.22)":"rgba(239,83,80,.18)";ctx.fill();}start=Math.max(0,i-1);}
@@ -128,19 +171,37 @@ export function LiveBitcoinChart({positions=[]}:{positions?:PaperPosition[]}){
 
  useEffect(()=>{
   let disposed=false,retry:ReturnType<typeof setTimeout>|null=null,poll:ReturnType<typeof setInterval>|null=null,socket:WebSocket|null=null;const chart=chartRef.current;
-  async function older(){if(disposed||loadingOlderRef.current||!hasMoreRef.current||!candlesRef.current.length)return;loadingOlderRef.current=true;setLoadingOlder(true);const visible=chart?.timeScale().getVisibleLogicalRange()??null;try{const end=candlesRef.current[0].time*1000-1;const p=await fetchCandleBlock(intervalRef.current,1000,end);if(disposed||intervalRef.current!==interval)return;const old=p.candles.filter(x=>x.time<candlesRef.current[0].time);hasMoreRef.current=p.hasMore&&old.length>0;if(!old.length)return;const map=new Map<number,Candle>();for(const x of [...old,...candlesRef.current])map.set(x.time,x);const merged=[...map.values()].sort((a,b)=>a.time-b.time);candlesRef.current=merged;setCandles(merged);applyAll(merged);if(visible)chart?.timeScale().setVisibleLogicalRange({from:visible.from+old.length,to:visible.to+old.length})}catch(e){if(!disposed)setError(e instanceof Error?e.message:"과거 차트 조회 실패")}finally{loadingOlderRef.current=false;if(!disposed)setLoadingOlder(false)}}
+  async function older(){if(disposed||chartDisposedRef.current||loadingOlderRef.current||!hasMoreRef.current||!candlesRef.current.length)return;loadingOlderRef.current=true;setLoadingOlder(true);const ts=activeTimeScale(chart);const visible=(()=>{try{return ts?.getVisibleLogicalRange()??null}catch{return null}})();try{const end=candlesRef.current[0].time*1000-1;const p=await fetchCandleBlock(intervalRef.current,1000,end);if(disposed||chartDisposedRef.current||intervalRef.current!==interval)return;const old=p.candles.filter(x=>x.time<candlesRef.current[0].time);hasMoreRef.current=p.hasMore&&old.length>0;if(!old.length)return;const map=new Map<number,Candle>();for(const x of [...old,...candlesRef.current])map.set(x.time,x);const merged=[...map.values()].sort((a,b)=>a.time-b.time);candlesRef.current=merged;setCandles(merged);applyAll(merged);if(visible){const currentTs=activeTimeScale(chart);try{currentTs?.setVisibleLogicalRange({from:visible.from+old.length,to:visible.to+old.length})}catch{}}}catch(e){if(!disposed&&!chartDisposedRef.current)setError(e instanceof Error?e.message:"과거 차트 조회 실패")}finally{loadingOlderRef.current=false;if(!disposed)setLoadingOlder(false)}}
   const visibleHandler=(range:{from:number;to:number}|null)=>{if(range&&range.from<80)void older()};
-  async function load(){setStatus("loading");setError(null);loadingOlderRef.current=false;hasMoreRef.current=true;try{const initial=await fetchMany(interval,initialTargets[interval]);if(disposed)return;if(!initial.candles.length)throw new Error("표시할 차트 데이터가 없습니다.");candlesRef.current=initial.candles;setCandles(initial.candles);hasMoreRef.current=initial.hasMore;applyAll(initial.candles);chart?.timeScale().fitContent()}catch(e){if(!disposed){setStatus("error");setError(e instanceof Error?e.message:"차트 데이터 오류")};return}connect()}
-  function incoming(items:Candle[]){if(!items.length||disposed||intervalRef.current!==interval)return;const map=new Map<number,Candle>();for(const x of candlesRef.current)map.set(x.time,x);for(const x of items)map.set(x.time,x);const merged=[...map.values()].sort((a,b)=>a.time-b.time);candlesRef.current=merged;const latest=merged.at(-1);if(latest)candleSeriesRef.current?.update(toChartCandle(latest));const now=Date.now();if(now-lastUiRefreshRef.current>1000){lastUiRefreshRef.current=now;setCandles(merged);applyAll(merged)}}
+  async function load(){setStatus("loading");setError(null);loadingOlderRef.current=false;hasMoreRef.current=true;try{const initial=await fetchMany(interval,initialTargets[interval]);if(disposed||chartDisposedRef.current)return;if(!initial.candles.length)throw new Error("표시할 차트 데이터가 없습니다.");candlesRef.current=initial.candles;setCandles(initial.candles);hasMoreRef.current=initial.hasMore;applyAll(initial.candles);const ts=activeTimeScale(chart);try{ts?.fitContent()}catch{}}catch(e){if(!disposed&&!chartDisposedRef.current){setStatus("error");setError(e instanceof Error?e.message:"차트 데이터 오류")};return}connect()}
+  function incoming(items:Candle[]){if(!items.length||disposed||chartDisposedRef.current||intervalRef.current!==interval)return;const map=new Map<number,Candle>();for(const x of candlesRef.current)map.set(x.time,x);for(const x of items)map.set(x.time,x);const merged=[...map.values()].sort((a,b)=>a.time-b.time);candlesRef.current=merged;const latest=merged.at(-1);if(latest){try{candleSeriesRef.current?.update(toChartCandle(latest))}catch{}}const now=Date.now();if(now-lastUiRefreshRef.current>1000){lastUiRefreshRef.current=now;setCandles(merged);applyAll(merged)}}
   function connect(){if(disposed)return;if(interval==="1M"){setStatus("live");return}socket=new WebSocket(`wss://fstream.binance.com/market/ws/btcusdt@kline_${interval}`);socket.onopen=()=>{if(!disposed){setStatus("live");setError(null);if(poll){clearInterval(poll);poll=null}}};socket.onmessage=e=>{try{const p=JSON.parse(e.data) as KlinePayload;if(!p.k)return;incoming([{time:Math.floor(Number(p.k.t)/1000),open:Number(p.k.o),high:Number(p.k.h),low:Number(p.k.l),close:Number(p.k.c),volume:Number(p.k.v)}])}catch{}};const pollLatest=async()=>{try{const p=await fetchCandleBlock(intervalRef.current,2);incoming(p.candles);if(!socket||socket.readyState!==WebSocket.OPEN)setStatus("reconnecting")}catch{setStatus("reconnecting")}};const fallback=()=>{if(!poll){void pollLatest();poll=setInterval(pollLatest,5000)}};socket.onclose=()=>{if(!disposed){setStatus("reconnecting");fallback();retry=setTimeout(connect,3000)}};socket.onerror=()=>{fallback();socket?.close()}}
-  chart?.timeScale().subscribeVisibleLogicalRangeChange(visibleHandler);void load();return()=>{disposed=true;if(retry)clearTimeout(retry);if(poll)clearInterval(poll);socket?.close();chart?.timeScale().unsubscribeVisibleLogicalRangeChange(visibleHandler)}
+  const intervalTs=activeTimeScale(chart);try{intervalTs?.subscribeVisibleLogicalRangeChange(visibleHandler)}catch{}void load();return()=>{disposed=true;if(retry)clearTimeout(retry);if(poll)clearInterval(poll);socket?.close();try{intervalTs?.unsubscribeVisibleLogicalRangeChange(visibleHandler)}catch{}}
  },[interval]);
 
- useEffect(()=>{for(const r of [ema20Ref,ema50Ref,ema100Ref,ema200Ref])r.current?.applyOptions({visible:overlays.ema});for(const r of [tenkanRef,kijunRef,spanARef,spanBRef])r.current?.applyOptions({visible:overlays.ichimoku});volumeRef.current?.applyOptions({visible:overlays.volume});requestAnimationFrame(()=>drawIchimokuCloud(candlesRef.current))},[overlays]);
- useEffect(()=>{const chart=chartRef.current;if(!chart)return;const redraw=()=>requestAnimationFrame(()=>drawIchimokuCloud(candlesRef.current));chart.timeScale().subscribeVisibleLogicalRangeChange(redraw);window.addEventListener("resize",redraw);return()=>{chart.timeScale().unsubscribeVisibleLogicalRangeChange(redraw);window.removeEventListener("resize",redraw)}},[overlays.ichimoku]);
+ useEffect(()=>{
+  if(chartDisposedRef.current)return;
+  try{for(const r of [ema20Ref,ema50Ref,ema100Ref,ema200Ref])r.current?.applyOptions({visible:overlays.ema});for(const r of [tenkanRef,kijunRef,spanARef,spanBRef])r.current?.applyOptions({visible:overlays.ichimoku});volumeRef.current?.applyOptions({visible:overlays.volume})}catch{}
+  scheduleCloudDraw();
+ },[overlays]);
+ useEffect(()=>{
+  const chart=chartRef.current;if(!chart||chartDisposedRef.current)return;
+  const redraw=()=>scheduleCloudDraw();
+  let timeScale:ReturnType<IChartApi["timeScale"]>|null=null;
+  try{timeScale=chart.timeScale();timeScale.subscribeVisibleLogicalRangeChange(redraw)}catch{return}
+  window.addEventListener("resize",redraw);
+  return()=>{
+   window.removeEventListener("resize",redraw);
+   if(cloudRafRef.current!=null){cancelAnimationFrame(cloudRafRef.current);cloudRafRef.current=null}
+   try{timeScale?.unsubscribeVisibleLogicalRangeChange(redraw)}catch{}
+  }
+ },[overlays.ichimoku]);
 
  useEffect(()=>{
-  const candle=candleSeriesRef.current;if(!candle||!selectedTrend)return;if(supportRef.current){candle.removePriceLine(supportRef.current);supportRef.current=null}if(resistanceRef.current){candle.removePriceLine(resistanceRef.current);resistanceRef.current=null}
+  if(chartDisposedRef.current)return;
+  const candle=candleSeriesRef.current;if(!candle||!selectedTrend)return;
+  try{
+   if(supportRef.current){candle.removePriceLine(supportRef.current);supportRef.current=null}if(resistanceRef.current){candle.removePriceLine(resistanceRef.current);resistanceRef.current=null}
   if(overlays.sr&&selectedTrend.support)supportRef.current=candle.createPriceLine({price:selectedTrend.support,color:"#22c55e",lineWidth:2,lineStyle:LineStyle.Dashed,axisLabelVisible:true,title:`지지 ${selectedTrend.supportStrength}/5`});
   if(overlays.sr&&selectedTrend.resistance)resistanceRef.current=candle.createPriceLine({price:selectedTrend.resistance,color:"#f59e0b",lineWidth:2,lineStyle:LineStyle.Dashed,axisLabelVisible:true,title:`저항 ${selectedTrend.resistanceStrength}/5`});
   const markers:any[]=[];if(overlays.structure){
@@ -150,6 +211,7 @@ export function LiveBitcoinChart({positions=[]}:{positions?:PaperPosition[]}){
    for(const e of majorEvents)markers.push({time:e.time as UTCTimestamp,position:e.direction==='bullish'?'belowBar':'aboveBar',color:e.type==='CHoCH'?'#a78bfa':'#38bdf8',shape:e.direction==='bullish'?'arrowUp':'arrowDown',text:`${e.type} ${e.direction==='bullish'?'↑':'↓'}`})
   }
   markerApiRef.current?.setMarkers(markers);
+  }catch(e){if(!chartDisposedRef.current)console.warn("[장기추세] 구조 오버레이 반영 실패",e)}
  },[selectedTrend,overlays.sr,overlays.structure]);
 
  const primary=positions[0]??null;
