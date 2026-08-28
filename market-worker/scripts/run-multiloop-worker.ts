@@ -47,6 +47,7 @@ import { runPerformanceEngine } from "../src/performance/run-performance-engine"
 import { runPerformanceBattle } from "../src/performance-battle/run-performance-battle";
 import { runFixedVsAdaptiveBattle } from "../src/adaptive-battle/run-fixed-vs-adaptive-battle";
 import { WorkerExecutionTracker } from "../src/operations/WorkerExecutionTracker";
+import { runLongTermTrendSnapshot } from "../src/long-term-trend/run-long-term-trend-snapshot";
 
 const CYCLE_INTERVAL_MS = Math.max(
   30,
@@ -227,6 +228,18 @@ async function runCoreAnalysisCycle(): Promise<void> {
     }
 
     await safeTask("Technical", () => analyzeBtcTechnical());
+
+    const longTrend = await safeTask("Long-Term Trend Snapshot", () =>
+      runLongTermTrendSnapshot(),
+    );
+    if (longTrend.ok && longTrend.value.status === "saved") {
+      const t = longTrend.value;
+      log(
+        `🧭 Long Trend · ${t.combinedLabel} ${t.combinedScore}/100` +
+          ` · conf=${t.confidence}/100 · risk=${t.risk}/100`,
+      );
+    }
+
     await safeTask("Regime V2", () => runMarketRegimeV2());
     await safeTask("Market Score", () => generateBtcMarketScore());
     await safeTask("Signal Calibration", () => refreshSignalCalibrationIfStale());

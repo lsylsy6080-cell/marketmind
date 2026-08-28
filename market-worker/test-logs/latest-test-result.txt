@@ -1,11 +1,11 @@
 ============================================================
 Market Worker 신규 테스트 결과
-실행 시각: 2026-08-26 15:06:06.14
+실행 시각: 2026-08-28 10:53:10.79
 프로젝트: C:\Project\coin-research\market-worker
 감지 기준: new-tests.txt 현재 단계 목록
 ============================================================
 
-[목록 1] src\etf-price-response\EtfFlowPriceResponseAnalyzer.test.ts
+[목록 1] src\long-term-trend\LongTermTrendEngine.test.ts
 
 [1/2] TypeScript 타입 검사
 ------------------------------------------------------------
@@ -20,15 +20,18 @@ Market Worker 신규 테스트 결과
 ------------------------------------------------------------
 
 ------------------------------------------------------------
-[NEW TEST 1 / 1] EtfFlowPriceResponseAnalyzer.test.ts
-경로: C:\Project\coin-research\market-worker\src\etf-price-response\
+[NEW TEST 1 / 1] LongTermTrendEngine.test.ts
+경로: C:\Project\coin-research\market-worker\src\long-term-trend\
 ------------------------------------------------------------
-[PASS] ETF 순유입 + BTC 상승은 confirmed_inflow
-[PASS] ETF 순유입인데 BTC 하락하면 매도 압력 우세로 판정
-[PASS] ETF 순유출인데 BTC 상승하면 흡수 강세로 판정
-[PASS] ETF 순유출 + BTC 하락은 confirmed_outflow
-[PASS] 가격 반응이 아직 없으면 collecting
-[PASS] 6h/12h/24h/48h 중 24h와 48h 반응을 더 크게 반영
+[PASS] 상승 장기 데이터는 중립보다 높은 점수를 만든다
+[PASS] 하락 장기 데이터는 중립보다 낮은 점수를 만든다
+[PASS] 조건별 시나리오 강도의 합은 100이다
+[PASS] 장기 종합은 주봉 40 · 일봉 40 · 4H 20 가중치를 사용한다
+[PASS] 충분한 표본은 데이터 충족도 100을 만든다
+[PASS] 현재 판단 지지는 8% 이내의 가장 가까운 4H/일봉 레벨을 선택한다
+[PASS] 너무 먼 장기 지지는 현재 횡보 시나리오 활성 조건에서 제외한다
+[PASS] 횡보는 근거리 유효 범위가 있을 때만 active가 된다
+[PASS] 거래량이 확인된 상승 구조 돌파는 상승 시나리오를 active로 승격한다
 
 ============================================================
 [성공] 현재 단계 신규 테스트를 모두 통과했습니다.

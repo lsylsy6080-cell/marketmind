@@ -73,7 +73,9 @@
     "news:pipeline:test": "tsx src/news/NewsPipelineV1.test.ts",
     "runner:full-once": "tsx scripts/run-multiloop-worker.ts",
     "etf:response:run": "tsx scripts/run-etf-price-response.ts",
-    "etf:response:test": "tsx src/etf-price-response/EtfFlowPriceResponseAnalyzer.test.ts"
+    "etf:response:test": "tsx src/etf-price-response/EtfFlowPriceResponseAnalyzer.test.ts",
+    "trend:snapshot:run": "tsx scripts/run-long-term-trend-snapshot.ts",
+    "trend:snapshot:test": "tsx src/long-term-trend/LongTermTrendEngine.test.ts"
   },
   "keywords": [],
   "author": "",

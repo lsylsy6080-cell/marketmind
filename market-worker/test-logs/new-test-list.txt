@@ -1,1 +1,1 @@
-C:\Project\coin-research\market-worker\src\etf-price-response\EtfFlowPriceResponseAnalyzer.test.ts
+C:\Project\coin-research\market-worker\src\long-term-trend\LongTermTrendEngine.test.ts

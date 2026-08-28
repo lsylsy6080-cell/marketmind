@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 
-type BinanceInterval = "5m" | "15m" | "1h" | "4h" | "1d";
+type BinanceInterval = "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 
 type BinanceKline = [
   number, // open time
@@ -17,7 +17,7 @@ type BinanceKline = [
   string, // ignore
 ];
 
-const INTERVALS: BinanceInterval[] = ["5m", "15m", "1h", "4h", "1d"];
+const INTERVALS: BinanceInterval[] = ["5m", "15m", "1h", "4h", "1d", "1w"];
 const BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines";
 
 function toIso(ms: number): string {

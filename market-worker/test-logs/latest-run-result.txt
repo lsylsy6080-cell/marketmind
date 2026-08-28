@@ -1,25 +1,17 @@
 ============================================================
 Market Worker 현재 단계 1회 RUN 결과
-실행 시각: 2026-08-26 15:07:43.81
+실행 시각: 2026-08-28 10:53:20.58
 프로젝트: C:\Project\coin-research\market-worker
 감지 기준: current-run.txt 현재 단계 목록
 ============================================================
 
-[목록 1] npm run etf:response:run
+[목록 1] npm run trend:snapshot:run
 
 ------------------------------------------------------------
-[CURRENT RUN 1 / 1] npm run etf:response:run
+[CURRENT RUN 1 / 1] npm run trend:snapshot:run
 ------------------------------------------------------------
 
-> market-worker@1.0.0 etf:response:run
-> tsx scripts/run-etf-price-response.ts
+> market-worker@1.0.0 trend:snapshot:run
+> tsx scripts/run-long-term-trend-snapshot.ts
 
-[ETF 가격반응 V1] 시작
-[ETF 가격반응 V1] 2026-07-21 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 2026-07-22 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 2026-07-23 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 2026-07-24 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 2026-07-27 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 2026-07-28 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 2026-07-29 기준 가격 없음 · 건너뜀
-[ETF 가격반응 V1] 완료 { requested: 7, completed: 0, collecting: 7, failed: 0 }
+[장기추세] 저장 완료 · id=2 · 상승 약화 63/100 · 신뢰도 89/100 · 전환경고도 55/100 · 현재지지 $77632.58 · 현재저항 $81272.62 · 횡보 invalidated · BTC $81093.48

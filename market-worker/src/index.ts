@@ -18,6 +18,7 @@ import { runAdaptiveSizing } from "./position-sizing/run-adaptive-sizing";
 import { refreshSignalCalibrationIfStale } from "./calibration/refresh-signal-calibration";
 import { WorkerExecutionTracker } from "./operations/WorkerExecutionTracker";
 import { supabase } from "./lib/supabase";
+import { runLongTermTrendSnapshot } from "./long-term-trend/run-long-term-trend-snapshot";
 
 const rootLog = console.log.bind(console);
 const rootError = console.error.bind(console);
@@ -96,6 +97,22 @@ async function main(): Promise<void> {
     );
 
     await analyzeBtcTechnical();
+
+    let longTrendSummary = "LongTrend N/A";
+    try {
+      const trendSnapshot = await runLongTermTrendSnapshot();
+      if (trendSnapshot.status === "saved") {
+        longTrendSummary =
+          `LongTrend ${trendSnapshot.combinedLabel} ${trendSnapshot.combinedScore}/100` +
+          ` conf=${trendSnapshot.confidence}/100 risk=${trendSnapshot.risk}/100`;
+      } else {
+        longTrendSummary = `LongTrend already-saved id=${trendSnapshot.existingId}`;
+      }
+    } catch (trendError) {
+      const message =
+        trendError instanceof Error ? trendError.message : String(trendError);
+      rootError(`[${formatKst()}] ⚠️ Long-Term Trend Snapshot 비활성 | ${message}`);
+    }
 
     let regimeSummary = "Regime N/A";
     try {
@@ -188,7 +205,7 @@ async function main(): Promise<void> {
     rootLog(
       `[${formatKst()}] ${state} | ${roundSeconds(startedAt)} | ` +
         `Candles 1m=${savedCount}, MTF=${multiTimeframeCount} | ` +
-        `${paperSummary} | ${regimeSummary} | ${aiSummary} | ${decisionV2Summary}`,
+        `${paperSummary} | ${regimeSummary} | ${longTrendSummary} | ${aiSummary} | ${decisionV2Summary}`,
     );
 
     if (trackingStarted) await tracker.finish();
