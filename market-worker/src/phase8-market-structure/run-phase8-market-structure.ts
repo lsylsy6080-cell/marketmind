@@ -18,9 +18,9 @@ export async function runPhase81MarketStructure():Promise<Phase81Result>{
  const currentPrice=profileInputs.find(x=>x.m==="spot"&&x.c.window==="24h")?.candles.at(-1)?.close;
  if(!currentPrice)throw new Error("[8-1] 현재 가격 확인 실패");
  const p0=Date.now(); const profiles=profileInputs.map(x=>buildVolumeProfile(x.m,x.c.window,x.c.timeframe,x.candles)); const profileMs=Date.now()-p0;
- const s0=Date.now(); const swings=structureInputs.flatMap(x=>detectSwings(x.candles,x.c.timeframe,x.m)); const sr=buildSupportResistance(currentPrice,profiles,swings); const structureMs=Date.now()-s0;
+ const s0=Date.now(); const swings=structureInputs.flatMap(x=>detectSwings(x.candles,x.c.timeframe,x.m)); const sr=buildSupportResistance(currentPrice,profiles,swings,structureInputs.map(x=>({timeframe:x.c.timeframe,marketType:x.m,candles:x.candles}))); const structureMs=Date.now()-s0;
  const calculatedAt=new Date().toISOString(), mem=process.memoryUsage();
- const result:Phase81Result={symbol:"BTCUSDT",calculatedAt,currentPrice,profiles,...sr,performance:{loadMs,profileMs,structureMs,saveMs:0,totalMs:0,rssMb:Number((mem.rss/1048576).toFixed(1)),heapMb:Number((mem.heapUsed/1048576).toFixed(1))},strategyVersion:"phase8-market-structure-v8.1"};
+ const result:Phase81Result={symbol:"BTCUSDT",calculatedAt,currentPrice,profiles,...sr,performance:{loadMs,profileMs,structureMs,saveMs:0,totalMs:0,rssMb:Number((mem.rss/1048576).toFixed(1)),heapMb:Number((mem.heapUsed/1048576).toFixed(1))},strategyVersion:"phase8-market-structure-v8.1.1"};
  const saveStart=Date.now();
  const {error}=await supabase.from("market_structure_snapshots").insert({symbol:result.symbol,calculated_at:result.calculatedAt,current_price:result.currentPrice,profiles:result.profiles,nearest_support:result.nearestSupport,next_support:result.nextSupport,nearest_resistance:result.nearestResistance,next_resistance:result.nextResistance,support_levels:result.supportLevels,resistance_levels:result.resistanceLevels,performance:result.performance,strategy_version:result.strategyVersion});
  if(error)throw new Error(`[8-1] snapshot 저장 실패: ${error.message}`);

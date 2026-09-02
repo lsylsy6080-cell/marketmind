@@ -5,7 +5,7 @@ import { buildMarketContext } from "./MarketContextEngine";
 import type { Phase83MarketContextResult } from "./types";
 
 function n(v:unknown){const x=Number(v);if(!Number.isFinite(x))throw new Error(`[8-3] 숫자 변환 실패: ${String(v)}`);return x;}
-function level(v:any){return v?{price:n(v.price),strength:n(v.strength),distancePercent:n(v.distancePercent),kind:v.kind,sources:Array.isArray(v.sources)?v.sources:[]}:null;}
+function level(v:any){return v?{price:n(v.price),zoneLow:n(v.zoneLow??v.price),zoneHigh:n(v.zoneHigh??v.price),strength:n(v.strength),grade:v.grade??"C",status:v.status??"active",distancePercent:n(v.distancePercent),kind:v.kind,sources:Array.isArray(v.sources)?v.sources:[],timeframes:Array.isArray(v.timeframes)?v.timeframes:[],touchCount:n(v.touchCount??0),rejectionPercent:n(v.rejectionPercent??0),lastTouchedAt:v.lastTouchedAt??null,roleFlipCount:n(v.roleFlipCount??0),scoreBreakdown:v.scoreBreakdown??{volume:0,touches:0,rejection:0,recency:0,confluence:0,roleFlip:0,invalidationPenalty:0},reasons:Array.isArray(v.reasons)?v.reasons:[]}:null;}
 
 async function loadLatestSources():Promise<{structure:Phase81Result;correlation:Phase82CorrelationResult}> {
   const [s,c]=await Promise.all([
@@ -15,7 +15,7 @@ async function loadLatestSources():Promise<{structure:Phase81Result;correlation:
   if(s.error||!s.data)throw new Error(`[8-3] Market Structure 조회 실패: ${s.error?.message??"데이터 없음"}`);
   if(c.error||!c.data)throw new Error(`[8-3] Correlation 조회 실패: ${c.error?.message??"데이터 없음"}`);
   return {
-    structure:{symbol:"BTCUSDT",calculatedAt:String(s.data.calculated_at),currentPrice:n(s.data.current_price),nearestSupport:level(s.data.nearest_support),nearestResistance:level(s.data.nearest_resistance),nextSupport:null,nextResistance:null,profiles:[],supportLevels:[],resistanceLevels:[],performance:{loadMs:0,profileMs:0,structureMs:0,saveMs:0,totalMs:0,rssMb:0,heapMb:0},strategyVersion:"phase8-market-structure-v8.1"},
+    structure:{symbol:"BTCUSDT",calculatedAt:String(s.data.calculated_at),currentPrice:n(s.data.current_price),nearestSupport:level(s.data.nearest_support),nearestResistance:level(s.data.nearest_resistance),nextSupport:null,nextResistance:null,profiles:[],supportLevels:[],resistanceLevels:[],performance:{loadMs:0,profileMs:0,structureMs:0,saveMs:0,totalMs:0,rssMb:0,heapMb:0},strategyVersion:"phase8-market-structure-v8.1.1"},
     correlation:{symbol:"BTCUSDT",calculatedAt:String(c.data.calculated_at),overallCorrelation:n(c.data.overall_correlation),overallDivergenceScore:n(c.data.overall_divergence_score),state:c.data.state,riskLevel:c.data.risk_level,timeframeDetails:[],reasons:[],performance:{loadMs:0,analysisMs:0,saveMs:0,totalMs:0,rssMb:0,heapMb:0},strategyVersion:"phase8-correlation-v8.2"}
   } as {structure:Phase81Result;correlation:Phase82CorrelationResult};
 }

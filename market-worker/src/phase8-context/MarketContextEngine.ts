@@ -51,6 +51,8 @@ export function buildMarketContext(input:Phase83ContextInput, now=new Date()):Om
   const reasons:string[]=[];
   if(upsideRoomPercent!==null) reasons.push(`상방 여유 ${round(upsideRoomPercent)}%`);
   if(downsideRoomPercent!==null) reasons.push(`하방 여유 ${round(downsideRoomPercent)}%`);
+  if(s?.grade)reasons.push(`하단 ${s.grade}급 지지 ${s.strength}/100 · ${(s.reasons??[]).slice(0,2).join(", ")}`);
+  if(r?.grade)reasons.push(`상단 ${r.grade}급 저항 ${r.strength}/100 · ${(r.reasons??[]).slice(0,2).join(", ")}`);
   reasons.push(`구조 상태 ${structureState}`);
   reasons.push(`Spot/Futures ${input.correlation.state} · 괴리 ${round(input.correlation.overallDivergenceScore,1)}/100`);
   if(permission==="avoid") reasons.push("상관/괴리 위험이 높아 신규 진입 회피");
