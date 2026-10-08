@@ -1,3 +1,4 @@
+import { runOnchain } from "../src/onchain/run-onchain";
 import { runSqueezeOpportunity } from "../src/squeeze-opportunity/run-squeeze-opportunity";
 import { runPhase7PipelineAudit } from "../src/phase7-audit/run-phase7-pipeline-audit";
 import { runSqueezeEarlyWarning } from "../src/squeeze-warning/run-squeeze-early-warning";
@@ -349,6 +350,7 @@ async function runPipelineCycle(initial = false): Promise<void> {
   const cycleStarted = Date.now();
   log(`──── Cycle #${cycleNumber} 시작${initial ? " (BOOT)" : ""} ────`);
 
+  if (process.env.ONCHAIN_ENABLED !== "false") await safeTask("BTC Onchain", () => runOnchain());
   await collectContinuous(initial);
 
   const structure = await safeTask("Phase 8-1 Market Structure", () => runPhase81MarketStructure());

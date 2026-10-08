@@ -1,3 +1,4 @@
+import { runOnchain } from "./onchain/run-onchain";
 import { generateBtcMarketScore } from "./analyzers/btc-market-score";
 import { runFinalMarketBacktests } from "./backtest/run-final-market-backtests";
 import { analyzeBtcTechnical } from "./analyzers/btc-technical";
@@ -89,6 +90,9 @@ async function main(): Promise<void> {
     // 개발 중 전체 세부 로그가 필요하면 WORKER_VERBOSE_LOGS=true 를 사용합니다.
     if (!verboseLogs) console.log = () => undefined;
 
+    if (process.env.ONCHAIN_ENABLED !== "false") {
+      try { await runOnchain(); } catch (error) { rootError("[Onchain]", error instanceof Error ? error.message : String(error)); }
+    }
     const savedCount = await collectBinanceBtcCandles(1000);
     const timeframeResult = await collectBtcChartTimeframes(500);
     const multiTimeframeCount = Object.values(timeframeResult).reduce(

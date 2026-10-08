@@ -1,7 +1,8 @@
+import { loadOnchainContext } from "../onchain/decision-context";
 import { assertFiniteValue, runDecisionEngine, round2 } from "../decision";
 import { supabase } from "../lib/supabase";
 
-const STRATEGY_VERSION = "final-market-ai-v2.3-semantic-dedup";
+const STRATEGY_VERSION = "final-market-ai-v2.4-onchain-context";
 const SEMANTIC_DEDUP_WINDOW_MINUTES = 5;
 const SCORE_TOLERANCE = 0.01;
 
@@ -280,6 +281,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
 
   const articleCount = getNewsArticleCount(news.score_details);
 
+  const onchain = await loadOnchainContext();
   const decision = runDecisionEngine({
     technical: {
       score: technicalScore,
@@ -320,9 +322,12 @@ export async function generateFinalMarketDecision(): Promise<void> {
     tradingPermission,
     alignment,
     weights,
-    summary: decisionSummary,
-    reasons: decisionReasons,
+    summary: baseDecisionSummary,
+    reasons: baseDecisionReasons,
   } = decision;
+
+  const decisionSummary = baseDecisionSummary + (onchain ? ` 온체인 배경 ${Number(onchain.onchain_score).toFixed(1)}/100, 데이터 충족도 ${onchain.onchain_confidence}%. 온체인은 참고 맥락으로 반영하며 진입 점수 가중치는 변경하지 않습니다.` : "");
+  const decisionReasons = [...baseDecisionReasons, ...(onchain ? [{ type: "onchain", ...onchain }] : [])];
 
   // 동일한 기술·뉴스·펀딩 입력 조합은 전략 버전별로 한 번만 저장합니다.
   const { data: existingDecision, error: existingDecisionError } =
@@ -334,6 +339,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
       .eq("news_score_id", news.id)
       .eq("funding_score_id", funding.id)
       .eq("strategy_version", STRATEGY_VERSION)
+      .contains("score_details", { onchain_snapshot_key: onchain?.key ?? null })
       .limit(1)
       .maybeSingle();
 
@@ -385,6 +391,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
     )
     .eq("symbol", "BTCUSDT")
     .eq("strategy_version", STRATEGY_VERSION)
+      .contains("score_details", { onchain_snapshot_key: onchain?.key ?? null })
     .gte("decided_at", semanticDedupCutoff)
     .order("decided_at", {
       ascending: false,
@@ -516,6 +523,8 @@ export async function generateFinalMarketDecision(): Promise<void> {
         decision_reasons:
           decisionReasons,
         score_details: {
+          onchain_snapshot_key: onchain?.key ?? null,
+          onchain,
           technical:
             technical.score_details,
           news:

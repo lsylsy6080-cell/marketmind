@@ -75,7 +75,10 @@
     "etf:response:run": "tsx scripts/run-etf-price-response.ts",
     "etf:response:test": "tsx src/etf-price-response/EtfFlowPriceResponseAnalyzer.test.ts",
     "trend:snapshot:run": "tsx scripts/run-long-term-trend-snapshot.ts",
-    "trend:snapshot:test": "tsx src/long-term-trend/LongTermTrendEngine.test.ts"
+    "trend:snapshot:test": "tsx src/long-term-trend/LongTermTrendEngine.test.ts",
+    "onchain:run": "tsx scripts/run-onchain.ts",
+    "onchain:dry": "tsx scripts/run-onchain.ts --dry-run",
+    "onchain:test": "tsx src/onchain/OnchainAnalysis.test.ts"
   },
   "keywords": [],
   "author": "",

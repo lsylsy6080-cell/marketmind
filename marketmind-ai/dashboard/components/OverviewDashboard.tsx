@@ -1,3 +1,4 @@
+import type { OnchainSnapshot } from "../onchain-data";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import styles from "./OverviewDashboard.module.css";
@@ -13,7 +14,7 @@ const scoreSigned=(v:unknown)=>{const n=num(v);if(n==null)return"—";const x=(n
 const tone=(v:string|null|undefined)=>String(v??"").includes("상승")||v==="bullish"?"positive":String(v??"").includes("하락")||v==="bearish"?"negative":"neutral";
 const stateKo=(v:string|null|undefined)=>v==="active"?"ACTIVE":v==="invalidated"?"INVALIDATED":"WATCH";
 
-export function OverviewDashboard({dashboard,market,news,trend,workerUpdatedAt}:{dashboard:PaperTradingData;market:MarketIntelligenceRow|null;news:NewsPageData;trend:LongTermTrendSnapshot|null;workerUpdatedAt?:string|null}){
+export function OverviewDashboard({dashboard,market,news,trend,workerUpdatedAt,onchain}:{dashboard:PaperTradingData;market:MarketIntelligenceRow|null;news:NewsPageData;trend:LongTermTrendSnapshot|null;workerUpdatedAt?:string|null;onchain?:OnchainSnapshot|null}){
   const decision=dashboard.decisions[0]??null;
   const plan=dashboard.decisionV2?.entry_plan??null;
   const price=dashboard.marketPrice??dashboard.funding?.mark_price??trend?.market_price??null;
@@ -39,7 +40,7 @@ export function OverviewDashboard({dashboard,market,news,trend,workerUpdatedAt}:
       <article><span>장기추세</span><strong className={`tone-${tone(trend?.combined_label)}`}>{trend?.combined_label??"수집 중"}</strong><small>강도 {trend?.combined_score??"—"}/100</small></article>
       <article><span>뉴스 점수</span><strong className={Number(newsScore??50)>=50?"paper-positive":"paper-negative"}>{scoreSigned(newsScore)}</strong><small>{news.score?.direction==="bullish"?"긍정적":news.score?.direction==="bearish"?"부정적":"중립적"}</small></article>
       <article><span>펀딩 점수</span><strong>{scoreSigned(fundingScore)}</strong><small>{normalizeLabel(dashboard.funding?.risk_level??"normal")}</small></article>
-      <article><span>온체인 점수</span><strong className="mock-muted-value">—</strong><small>수집기 연결 준비</small></article>
+      <article><span>온체인 점수</span><strong>{onchain?.onchain_score==null?"—":Number(onchain.onchain_score).toFixed(1)}</strong><small>{onchain?.onchain_score!=null?`데이터 충족도 ${onchain.onchain_confidence}%`:"수집 대기"}</small></article>
     </div>
 
     <div className="mock-main-grid">

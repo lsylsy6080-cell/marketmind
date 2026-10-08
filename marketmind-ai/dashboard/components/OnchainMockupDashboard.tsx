@@ -1,61 +1,42 @@
-import type { CSSProperties } from "react";
-import type { OnchainSnapshot } from "../onchain-data";
-
-const pick=(row:OnchainSnapshot|null,...keys:string[])=>{for(const k of keys){const v=row?.[k];if(v!==undefined&&v!==null)return v}return null};
-const n=(v:any)=>Number.isFinite(Number(v))?Number(v):null;
-const num=(v:any,d=2)=>{const x=n(v);return x==null?"—":x.toLocaleString("en-US",{maximumFractionDigits:d})};
-const signed=(v:any,suffix="")=>{const x=n(v);return x==null?"—":`${x>=0?"+":""}${num(x)}${suffix}`};
-const metric=(row:OnchainSnapshot|null,...keys:string[])=>n(pick(row,...keys));
-
-export function OnchainMockupDashboard({latest,history,connected,error}:{latest:OnchainSnapshot|null;history:OnchainSnapshot[];connected:boolean;error:string|null}){
- const score=metric(latest,"onchain_score","score");
- const netflow=metric(latest,"exchange_netflow_btc","exchange_net_flow_btc","netflow_btc");
- const etf=metric(latest,"etf_netflow_btc","etf_net_flow_btc");
- const active=metric(latest,"active_addresses","active_address_count");
- const hash=metric(latest,"hash_rate_eh","hashrate_eh","hash_rate");
- const mvrv=metric(latest,"mvrv","mvrv_zscore","mvrv_z_score");
- const sopr=metric(latest,"sopr","sopr_7d");
- const balance=metric(latest,"exchange_balance_btc","exchange_reserve_btc");
- const whale=metric(latest,"large_transfer_count","whale_transfer_count");
- const fee=metric(latest,"fee_fast","fast_fee","mempool_fee");
- const holder=String(pick(latest,"holder_state","long_term_holder_state")??(connected?"수집 중":"연동 준비"));
- const confidence=metric(latest,"onchain_confidence","confidence");
- const bars=history.slice().reverse().slice(-36);
- return <section className="mock-page mock-onchain">
-  {!connected?<div className="mock-connection-note"><b>온체인 수집기 연결 전</b><span>페이지 구조는 먼저 완성했습니다. `onchain_snapshots` 데이터가 들어오면 카드와 차트가 자동으로 채워지도록 구성했습니다.</span></div>:null}
-  {connected&&error?<div className="notice notice-error"><strong>온체인 데이터를 불러오지 못했습니다.</strong><span>{error}</span></div>:null}
-  <div className="mock-kpi-grid mock-kpi-six">
-   <article><span>⌁ 온체인 점수</span><strong className={score!=null&&score>=55?"paper-positive":score!=null&&score<=45?"paper-negative":""}>{score==null?"—":score.toFixed(2)}</strong><small>{score==null?"수집 준비":score>=55?"긍정적":score<=45?"부정적":"중립적"}</small></article>
-   <article><span>↕ 거래소 순유출입 (24h)</span><strong className={(netflow??0)<=0?"paper-positive":"paper-negative"}>{signed(netflow," BTC")}</strong><small>{netflow==null?"데이터 대기":netflow<0?"순유출":"순유입"}</small></article>
-   <article><span>▥ ETF 순유입 (24h)</span><strong className={(etf??0)>=0?"paper-positive":"paper-negative"}>{signed(etf," BTC")}</strong><small>ETF 흐름</small></article>
-   <article><span>♙ 활성 주소 (24h)</span><strong>{num(active,0)}</strong><small>네트워크 활동</small></article>
-   <article><span>⌘ 해시레이트</span><strong>{hash==null?"—":`${num(hash,1)} EH/s`}</strong><small>네트워크 보안</small></article>
-   <article><span>◷ 장기 보유자 동향</span><strong className="paper-positive">{holder}</strong><small>LTH 상태</small></article>
-  </div>
-
-  <div className="mock-onchain-main">
-   <article className="mock-panel mock-onchain-chart"><header><h2>온체인 종합 흐름 ⓘ</h2><div><button>24시간</button><button className="active">7일</button><button>30일</button></div></header><div className="onchain-legend"><span className="blue">● 온체인 점수</span><span className="orange">● BTC 가격</span><span className="purple">● 활성 주소</span></div><div className="onchain-lines">{bars.length?bars.map((x,i)=>{const s=metric(x,"onchain_score","score")??50;const a=metric(x,"active_addresses","active_address_count")??0;return <i key={x.id??i} style={{height:`${Math.max(8,Math.min(96,s))}%`,opacity:.55+Math.min(.4,(a%10)/25)} as CSSProperties}/>}):<span>온체인 히스토리 수집 대기</span>}</div><footer>온체인 점수는 가치평가 · 네트워크 활동 · 거래소 흐름 · 채굴/수수료 지표를 종합하도록 설계합니다.</footer></article>
-   <div className="mock-onchain-side">
-    <article className="mock-panel mock-onchain-signals"><h2>⚙ 핵심 온체인 신호</h2>{[
-     ["거래소 순유출입",netflow,netflow!=null&&netflow<0?"강세":netflow!=null&&netflow>0?"주의":"대기"],
-     ["장기 보유자",null,holder],["MVRV",mvrv,mvrv==null?"대기":mvrv<1.5?"저평가/중립":"주의"],["SOPR",sopr,sopr==null?"대기":sopr>1?"이익 실현":"손실 실현"],["활성 주소",active,active==null?"대기":"활동 확인"],["해시레이트",hash,hash==null?"대기":"네트워크 정상"]
-    ].map(([label,value,state])=><div key={String(label)}><span>{label}</span><b>{value==null?"—":num(value)}</b><em>{String(state)}</em></div>)}</article>
-    <article className="mock-panel mock-exchange-flow"><h2>◷ 거래소 흐름 (24h)</h2><table><thead><tr><th>구분</th><th>순유출입</th><th>판단</th></tr></thead><tbody><tr><td>전체 거래소</td><td className={(netflow??0)<=0?"paper-positive":"paper-negative"}>{signed(netflow," BTC")}</td><td>{netflow==null?"대기":netflow<0?"순유출":"순유입"}</td></tr><tr><td>대형 이동</td><td>{whale==null?"—":`${num(whale,0)}건`}</td><td>모니터링</td></tr><tr><td>수수료</td><td>{fee==null?"—":`${num(fee,1)} sat/vB`}</td><td>혼잡도</td></tr></tbody></table></article>
-    <article className="mock-panel mock-holder"><h2>◔ 장기 / 단기 보유자</h2><div className="holder-gauge"><i/><b>{holder}</b></div><p>장기 보유자 공급 변화와 단기 보유자 움직임을 함께 추적할 영역입니다.</p></article>
-   </div>
-  </div>
-
-  <div className="mock-onchain-cards">
-   {[
-    ["MVRV Z-Score",mvrv,mvrv==null?"수집 준비":mvrv<1?"저평가":mvrv>3?"과열":"중립"],
-    ["SOPR (7일 평균)",sopr,sopr==null?"수집 준비":sopr>1?"이익 실현":"손실 실현"],
-    ["거래소 보유량",balance,balance==null?"수집 준비":"공급 추적"],
-    ["고래 이동 (24h)",whale,whale==null?"수집 준비":"대형 이동"],
-    ["수수료 / 메모리풀",fee,fee==null?"수집 준비":"혼잡도"],
-    ["ETF 자금 흐름",etf,etf==null?"수집 준비":etf>=0?"순유입":"순유출"]
-   ].map(([label,value,state])=><article className="mock-panel" key={String(label)}><span>{label} ⓘ</span><strong>{value==null?"—":num(value)}</strong><small>{String(state)}</small><div className="tiny-spark"><i/><i/><i/><i/><i/></div></article>)}
-  </div>
-
-  <article className="mock-panel mock-onchain-ai"><div><span>온체인 종합 판단</span><strong className={score!=null&&score>=55?"paper-positive":score!=null&&score<=45?"paper-negative":""}>{score==null?"수집 준비":score>=55?"강세 (Bullish)":score<=45?"약세 (Bearish)":"중립 (Neutral)"}</strong><small>신뢰도 {confidence==null?"—":`${confidence.toFixed(0)}%`}</small></div><section><h2>AI 해석</h2><p>{score==null?"온체인 데이터 수집기가 연결되면 거래소 순유출입, 가치평가, 네트워크 활동, 해시레이트와 ETF 흐름을 종합해 장기·중기 시장 배경을 평가합니다.":`현재 온체인 종합 점수는 ${score.toFixed(1)}입니다. 거래소 흐름과 네트워크 활동을 장기추세 분석과 함께 비교해 구조적 매수·매도 압력을 판단합니다.`}</p></section><aside><h2>리스크 요인</h2><ul><li>SOPR 과열 시 단기 이익실현 위험</li><li>거래소 순유입 급증 시 매도 압력 가능성</li><li>거시경제 이벤트는 온체인과 별개로 변동성 확대 가능</li></ul></aside></article>
- </section>
+'use client';
+import { useState } from 'react';
+import type { OnchainSnapshot, OnchainMetric, OnchainHistorySnapshot } from '../onchain-data';
+import styles from './OnchainDashboard.module.css';
+const format = (n:number|null|undefined, digits=2) => n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('en-US',{maximumFractionDigits:digits});
+const date = (s:string) => new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s));
+const names:Record<string,string> = {active_addresses:'활성 주소',transactions_24h:'일간 거래 수',mvrv:'MVRV',hash_rate_eh:'해시레이트',exchange_inflow_btc:'거래소 유입',exchange_outflow_btc:'거래소 유출',exchange_balance_btc:'거래소 보유량',exchange_netflow_btc:'거래소 순유입',fee_fast:'우선 수수료',fee_hour:'1시간 수수료',mempool_tx_count:'미확정 거래',mempool_vsize:'메모리풀 크기',circulating_supply_btc:'유통 공급량',difficulty:'채굴 난이도',difficulty_change_pct:'예상 난이도 변화',market_cap_usd:'시가총액',active_addresses_change_7d_pct:'활성 주소 평균 변화',bc_issuance_btc:'일간 발행량'};
+function MetricCard({label,metric}:{label:string;metric:OnchainMetric|undefined}) {
+  return <article className={styles.card}><span>{label}</span><strong>{format(metric?.value)} <small>{metric?.unit}</small></strong><footer>{metric ? `${metric.source} · ${date(metric.observed_at)} 기준`:'수집 대기'}</footer></article>;
+}
+export function OnchainMockupDashboard({latest,history,connected,error}:{latest:OnchainSnapshot|null;history:OnchainHistorySnapshot[];connected:boolean;error:string|null}) {
+  const [range,setRange] = useState(7);
+  const [view,setView] = useState('score');
+  const metrics = latest?.metrics ?? {};
+  const anchor = latest ? Date.parse(latest.calculated_at) : 0;
+  const rows = history.slice().reverse().filter(r=>Date.parse(r.snapshot_hour) >= anchor-range*86400_000);
+  let points = rows.map(r=>({time:r.snapshot_hour,value:view==='score'?r.onchain_score:r.metrics[view]?.value??null}));
+  // Daily provider history is retained at collection time; use it for actual daily comparisons.
+  if (view==='active_addresses') {
+    const raw = latest?.raw_data.coinmetrics as {days?:{time:string;AdrActCnt:string|null}[]}|undefined;
+    points = (raw?.days??[]).filter(r=>Date.parse(r.time)>=anchor-range*86400_000).map(r=>({time:r.time,value:r.AdrActCnt==null?null:Number(r.AdrActCnt)}));
+  }
+  const valid=points.filter((p):p is {time:string;value:number}=>p.value!==null&&Number.isFinite(p.value));
+  const low=Math.min(...valid.map(p=>p.value)),high=Math.max(...valid.map(p=>p.value));
+  const start=valid.length?Date.parse(valid[0].time):0,end=valid.length?Date.parse(valid.at(-1)!.time):0;
+  const x=(t:string)=>34+(Date.parse(t)-start)/Math.max(1,end-start)*732;
+  const y=(v:number)=>180-(v-low)/Math.max(1,high-low)*145;
+  const segments:string[]=[];let current='';
+  for(const p of points){if(p.value===null||!Number.isFinite(p.value)){if(current)segments.push(current);current='';}else current+=`${current?' L':'M'}${x(p.time).toFixed(1)},${y(p.value).toFixed(1)}`;}if(current)segments.push(current);
+  const completed = Object.values(latest?.sources??{}).filter(s=>s.ok).length;
+  return <section className={styles.page}>
+    <header className={styles.header}><div><span className={styles.kicker}>BITCOIN / ONCHAIN INTELLIGENCE</span><h2>네트워크의 움직임을 읽다</h2><p>공개 온체인 지표 · 원본 보존 · 시간당 자동 갱신</p></div><span className={styles.badge}>{latest?`${completed}/${Object.keys(latest.sources).length} 요청 정상`:'수집 대기'}</span></header>
+    {error?<div role="alert" className={styles.notice}>온체인 조회 실패: {error}</div>:!latest?<div className={styles.notice}>{connected?'첫 온체인 수집을 기다리고 있습니다.':'온체인 저장소 연결 대기'}</div>:null}
+    <div className={styles.kpis}><article className={styles.card}><span>온체인 배경 점수</span><strong>{format(latest?.onchain_score,1)} <small>/ 100</small></strong><footer>데이터 충족도 {latest?.onchain_confidence??0}% · 휴리스틱 분석</footer></article>{['active_addresses','transactions_24h','hash_rate_eh','mvrv','exchange_netflow_btc'].map(key=><MetricCard key={key} label={names[key]} metric={metrics[key]}/>)}</div>
+    <div className={styles.main}><article className={styles.panel}><header className={styles.chartHeader}><h3>온체인 추이</h3><div>{[1,7,30].map(d=><button key={d} aria-pressed={range===d} onClick={()=>setRange(d)}>{d===1?'24시간':`${d}일`}</button>)}</div></header><div className={styles.legend}>{[['score','종합 점수'],['active_addresses','활성 주소'],['hash_rate_eh','해시레이트']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}</div>
+    {valid.length>=2?<><svg className={styles.chart} viewBox="0 0 800 230" role="img" aria-label={`${view==='score'?'종합 점수':names[view]} ${range}일 추이`}>{[35,107,180].map((yy,i)=><g key={yy}><line x1="34" x2="766" y1={yy} y2={yy} stroke="#263747"/><text x="34" y={yy-6} fill="#92a3b8" fontSize="11">{format(high-(high-low)*i/2,1)}</text></g>)}{segments.map((path,i)=><path key={i} d={path} fill="none" stroke="#69b9e9" strokeWidth="2.5"/>)}<text x="34" y="216" fill="#92a3b8" fontSize="11">{date(valid[0].time)}</text><text x="766" y="216" textAnchor="end" fill="#92a3b8" fontSize="11">{date(valid.at(-1)!.time)}</text></svg><p className={styles.footnote}>{valid.length}개 실제 관측값 · 누락 구간은 연결하지 않습니다.</p></>:<div className={styles.empty}>추이 표시에는 관측값이 2개 이상 필요합니다. 활성 주소는 공개 일간 이력을 확인할 수 있습니다.</div>}
+    <p className={styles.footnote}>일간 지표는 완료된 공급자 관측을 사용합니다. 점수는 시장 배경의 참고 지표이며 수익 확률이 아닙니다.</p></article>
+    <article className={styles.panel}><h3>분석 근거</h3>{latest?.signals.map(s=><div className={styles.signal} key={s.key}><header><b>{s.label}</b><strong>{format(s.score,1)}</strong></header><p>{s.reason}</p></div>)}<p className={styles.footnote}>가치평가 · 거래소 흐름 · 네트워크 활동을 동일 비중으로 비교합니다. 해시레이트와 수수료는 매수·매도 점수에 직접 사용하지 않습니다.</p></article></div>
+    <div className={styles.detailsGrid}><article className={styles.panel}><h3>수집 소스</h3><div className={styles.sourceList}>{Object.entries(latest?.sources??{}).map(([key,s])=><div className={styles.source} key={key}><div><b>{key.replace('mempool_','mempool.space / ')}</b><small>{s.ok?`${s.metric_count}개 원본·파생 지표`:s.error}</small></div><span className={s.ok?styles.ok:styles.warn}>{s.ok?'응답 정상':'조회 실패'}</span></div>)}</div>{latest?<p className={styles.footnote}>마지막 수집 {date(latest.calculated_at)} KST · 응답 성공과 개별 지표의 최신성은 별개입니다.</p>:null}</article><article className={styles.panel}><h3>데이터 범위</h3><p>Coin Metrics Community의 BTC 일간 공개 카탈로그 전체와 Blockchain.com 네트워크 통계, mempool.space 수수료·메모리풀·채굴 지표를 보존합니다.</p><p>거래소 흐름은 공급자가 식별한 주소 범위이며 전체 거래소의 확정 유출입이 아닙니다. MVRV는 Z-Score와 구분합니다.</p><p className={styles.footnote}>SOPR, 장기·단기 보유자 분류, 고래 라벨, ETF 흐름은 현재 검증한 무료 온체인 소스에 없어 생성하지 않습니다. ETF는 별도 금융 데이터입니다.</p></article></div>
+    <details className={styles.panel}><summary>수집 지표 전체 보기 · {Object.keys(metrics).length}개</summary><div className={styles.tableWrap}><table><thead><tr><th>지표</th><th>값</th><th>단위</th><th>출처</th><th>기준 시각 (KST)</th><th>상태</th></tr></thead><tbody>{Object.entries(metrics).map(([key,m])=><tr key={key}><td>{names[key]??key}</td><td>{format(m.value,4)}</td><td>{m.unit}</td><td>{m.source}</td><td>{date(m.observed_at)}</td><td>{m.value===null?"미제공 / 유효값 없음":anchor-Date.parse(m.observed_at)>72*3600000?"지연":"관측값"}</td></tr>)}</tbody></table></div></details>
+  </section>;
 }
