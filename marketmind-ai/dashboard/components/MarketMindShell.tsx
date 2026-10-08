@@ -1,4 +1,5 @@
 import Link from "next/link";
+import styles from "./MarketMindShell.module.css";
 import type { ReactNode } from "react";
 import { ShellMarketStatus } from "./ShellMarketStatus";
 
@@ -33,7 +34,7 @@ const pageTitle: Record<ActivePage, string> = {
 
 export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, children }: MarketMindShellProps) {
   return (
-    <main className="mm-app-shell mm-mockup-shell">
+    <main className={`${styles.shell} mm-app-shell mm-mockup-shell`}>
       <aside className="mm-sidebar mm-mockup-sidebar">
         <Link href="/" className="mm-side-brand" aria-label="MarketMind AI 홈">
           <img src="/marketmind-logo.svg" alt="" />
@@ -42,7 +43,7 @@ export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, chi
 
         <nav className="mm-side-nav" aria-label="MarketMind 메뉴">
           {navItems.map((item) => (
-            <Link key={item.id} href={item.href} className={active === item.id ? "active" : ""}>
+            <Link key={item.id} href={item.href} aria-current={active === item.id ? "page" : undefined} className={active === item.id ? "active" : ""}>
               <i aria-hidden="true">{item.icon}</i>
               <span>{item.label}</span>
             </Link>
@@ -50,8 +51,8 @@ export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, chi
         </nav>
 
         <div className="mm-server-card">
-          <div><span className="server-gem">◆</span><strong>Server Mode</strong></div>
-          <small>Buddy4 · PM2 Worker</small>
+          <div><span className="server-gem">◆</span><strong>운영 상태</strong></div>
+          <small>데이터 수집 및 서비스 상태</small>
           <Link href="/settings">상태 관리 <b>›</b></Link>
         </div>
       </aside>
@@ -64,7 +65,7 @@ export function MarketMindShell({ active, updatedAt, workerUpdatedAt = null, chi
             <nav className="mm-mobile-menu-drawer" aria-label="MarketMind 모바일 전체 메뉴">
               <div className="mm-mobile-menu-head"><img src="/marketmind-logo.svg" alt="" /><div><strong>MarketMind AI</strong><span>전체 메뉴</span></div></div>
               {navItems.map((item) => (
-                <Link key={`mobile-${item.id}`} href={item.href} className={active === item.id ? "active" : ""}>
+                <Link key={`mobile-${item.id}`} href={item.href} aria-current={active === item.id ? "page" : undefined} className={active === item.id ? "active" : ""}>
                   <i aria-hidden="true">{item.icon}</i><span>{item.label}</span><b aria-hidden="true">›</b>
                 </Link>
               ))}
