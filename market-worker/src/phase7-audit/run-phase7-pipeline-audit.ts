@@ -1,5 +1,5 @@
 import "dotenv/config";
-import {supabase} from "../lib/supabase";
+import {database} from "../lib/database";
 import {auditPhase7Pipeline,type AuditStageInput} from "./Phase7PipelineAudit";
 
 const n=(v:unknown):number|null=>{
@@ -9,7 +9,7 @@ const n=(v:unknown):number|null=>{
 const s=(v:unknown):string|null=>v==null?null:String(v);
 
 async function latest(table:string,select:string,orderColumn:string){
-  const {data,error}=await supabase.from(table)
+  const {data,error}=await database.from(table)
     .select(select)
     .eq("symbol","BTCUSDT")
     .order(orderColumn,{ascending:false})
@@ -27,7 +27,7 @@ export async function runPhase7PipelineAudit(){
     latest("squeeze_probability_snapshots","calculated_at,strategy_version","calculated_at"),
     latest("squeeze_early_warning_snapshots","calculated_at,strategy_version","calculated_at"),
     latest("ai_decision_v2_snapshots","calculated_at,strategy_version","calculated_at"),
-    supabase.from("adaptive_paper_accounts")
+    database.from("adaptive_paper_accounts")
       .select("id,is_active")
       .eq("is_active",true)
       .order("id",{ascending:true})
@@ -86,7 +86,7 @@ export async function runPhase7PipelineAudit(){
 
   const result=auditPhase7Pipeline({stages});
   const bucket=new Date(Math.floor(Date.now()/60_000)*60_000).toISOString();
-  const {error:saveError}=await supabase.from("phase7_pipeline_audit_snapshots").upsert({
+  const {error:saveError}=await database.from("phase7_pipeline_audit_snapshots").upsert({
     symbol:"BTCUSDT",
     bucket_time:bucket,
     calculated_at:result.calculatedAt,

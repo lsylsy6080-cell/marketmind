@@ -17,7 +17,7 @@ export type ProjectHealthData = {
 const fallbackServices: DevelopmentService[] = [
   {
     name: "데이터베이스",
-    description: "Vercel과 Supabase 연결 상태",
+    description: "Vercel과 Buddy4 PostgreSQL 연결 상태",
     status: "warning",
     detail: "상태 확인 실패",
   },

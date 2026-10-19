@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   categorizeNewsArticle,
 } from "./news-event-categorizer";
@@ -314,7 +314,7 @@ export async function enrichLatestBtcNewsScore(): Promise<void> {
   const {
     data: scoreDataRaw,
     error: scoreError,
-  } = await supabase
+  } = await database
     .from("news_scores")
     .select(
       "id, calculated_at, window_hours, weighted_score, confidence, score_details",
@@ -353,7 +353,7 @@ export async function enrichLatestBtcNewsScore(): Promise<void> {
         1000,
   );
 
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("news_articles")
     .select(
       [
@@ -484,7 +484,7 @@ export async function enrichLatestBtcNewsScore(): Promise<void> {
     );
 
   const { error: updateError } =
-    await supabase
+    await database
       .from("news_scores")
       .update({
         event_categories:

@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -84,11 +84,11 @@ export async function GET() {
   const checkedAt = nowIso();
 
   try {
-    const supabase = createAdminClient();
+    const database = createAdminClient();
     const started = performance.now();
 
     const [candleResult, decisionResult] = await Promise.all([
-      supabase
+      database
         .from("market_candles")
         .select("open_time")
         .eq("exchange", "binance")
@@ -99,7 +99,7 @@ export async function GET() {
         .order("open_time", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("final_market_decisions")
         .select("created_at")
         .order("created_at", { ascending: false })
@@ -118,7 +118,7 @@ export async function GET() {
     const services: ServiceResult[] = [
       {
         name: "데이터베이스",
-        description: "Vercel과 Supabase 연결 상태",
+        description: "Vercel과 Buddy4 PostgreSQL 연결 상태",
         status: latencyMs >= 2500 ? "warning" : "healthy",
         detail: latencyMs >= 2500 ? `응답 지연 · ${latencyMs}ms` : `연결 정상 · ${latencyMs}ms`,
         latencyMs,
@@ -158,7 +158,7 @@ export async function GET() {
     const services: ServiceResult[] = [
       {
         name: "데이터베이스",
-        description: "Vercel과 Supabase 연결 상태",
+        description: "Vercel과 Buddy4 PostgreSQL 연결 상태",
         status: "offline",
         detail: "연결 확인 실패",
         checkedAt,

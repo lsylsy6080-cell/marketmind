@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { evaluateAutoRollbackProtection } from "./AutoRollbackProtection";
 import type { Phase811RollbackResult, RollbackPerformancePoint } from "./types";
 
@@ -15,10 +15,10 @@ function mapPerformance(row:any):RollbackPerformancePoint{
 
 export async function runPhase811AutoRollbackProtection():Promise<Phase811RollbackResult>{
   const [tuning,performance]=await Promise.all([
-    supabase.from("context_tuning_candidates")
+    database.from("context_tuning_candidates")
       .select("id,status,auto_apply_allowed,calculated_at")
       .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
-    supabase.from("context_performance_snapshots")
+    database.from("context_performance_snapshots")
       .select("sample_count,success_rate,average_quality_score,missed_opportunity_count,avoided_loss_count,status,calculated_at")
       .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(2),
   ]);
@@ -39,7 +39,7 @@ export async function runPhase811AutoRollbackProtection():Promise<Phase811Rollba
     current,
   });
 
-  const {error:saveError}=await supabase.from("context_rollback_snapshots").insert({
+  const {error:saveError}=await database.from("context_rollback_snapshots").insert({
     symbol:"BTCUSDT",
     calculated_at:new Date().toISOString(),
     tuning_candidate_id:Number((tuning.data as any).id),

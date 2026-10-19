@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import Parser from "rss-parser";
 
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { NEWS_SOURCES, type NewsSource } from "./news-sources";
 import { buildEventFingerprint, calculateBtcRelevance, normalizeNewsText } from "./news-pipeline-utils";
 
@@ -99,6 +99,7 @@ function buildExternalId(
 
 async function collectSource(
   source: NewsSource,
+  parseFeed = parser.parseURL.bind(parser),
 ): Promise<{
   fetched: number;
   relevant: number;
@@ -106,7 +107,7 @@ async function collectSource(
 }> {
   console.log(`[뉴스수집] ${source.name} RSS 조회 시작`);
 
-  const feed = await parser.parseURL(source.feedUrl);
+  const feed = await parseFeed(source.feedUrl);
 
   const rows: NewsArticleRow[] = [];
 
@@ -177,7 +178,7 @@ async function collectSource(
     };
   }
 
-  const { error } = await supabase
+  const { error } = await database
     .from("news_articles")
     .upsert(rows, {
       onConflict: "article_url",
@@ -201,7 +202,7 @@ async function collectSource(
   };
 }
 
-export async function collectBtcNews(): Promise<void> {
+export async function collectBtcNews(options: { parseFeed?: typeof parser.parseURL } = {}): Promise<void> {
   const sources = NEWS_SOURCES.filter(
     (source) => source.enabled,
   );
@@ -217,7 +218,7 @@ export async function collectBtcNews(): Promise<void> {
 
   for (const source of sources) {
     try {
-      const result = await collectSource(source);
+      const result = await collectSource(source, options.parseFeed);
 
       totalFetched += result.fetched;
       totalRelevant += result.relevant;

@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { EtfFlowPriceResponseResult } from "./types";
 
 export interface EtfSnapshotRow {
@@ -16,7 +16,7 @@ export interface PricePoint {
 }
 
 export async function loadRecentBtcEtfFlows(limit=20):Promise<EtfSnapshotRow[]>{
-  const {data,error}=await supabase
+  const {data,error}=await database
     .from("etf_flow_snapshots")
     .select("id,asset,market,flow_date,total_flow_usd,source")
     .eq("asset","BTC")
@@ -42,7 +42,7 @@ export async function loadBtcPrices(
   startAt:string,
   endAt:string,
 ):Promise<PricePoint[]>{
-  const {data,error}=await supabase
+  const {data,error}=await database
     .from("market_candles")
     .select("open_time,close")
     .eq("exchange","binance")
@@ -68,7 +68,7 @@ export async function saveEtfPriceResponse(
 ):Promise<void>{
   const reaction=(hours:number)=>result.reactions.find((r)=>r.horizonHours===hours);
 
-  const {error}=await supabase
+  const {error}=await database
     .from("etf_flow_price_responses")
     .upsert({
       asset:result.asset,

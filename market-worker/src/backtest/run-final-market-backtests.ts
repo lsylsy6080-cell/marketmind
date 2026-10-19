@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 const SYMBOL = "BTCUSDT";
 const BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines";
@@ -219,7 +219,7 @@ async function fetchBinanceMinuteOpenPrice(
 
 async function createMissingBacktests(): Promise<number> {
   const { data: decisionsRaw, error: decisionsError } =
-    await supabase
+    await database
       .from("final_market_decisions")
       .select("id, symbol, decided_at")
       .order("decided_at", {
@@ -245,7 +245,7 @@ async function createMissingBacktests(): Promise<number> {
   );
 
   const { data: existingRaw, error: existingError } =
-    await supabase
+    await database
       .from("final_market_backtests")
       .select("decision_id")
       .in("decision_id", decisionIds);
@@ -258,7 +258,7 @@ async function createMissingBacktests(): Promise<number> {
 
   const existingIds = new Set(
     (existingRaw ?? []).map(
-      (row: { decision_id: number }) =>
+      (row) =>
         Number(row.decision_id),
     ),
   );
@@ -286,7 +286,7 @@ async function createMissingBacktests(): Promise<number> {
         entryTimeMs,
       );
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await database
         .from("final_market_backtests")
         .upsert(
           {
@@ -461,7 +461,7 @@ async function updateOneBacktest(
   updates.last_error = null;
   updates.retry_count = 0;
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await database
     .from("final_market_backtests")
     .update(updates)
     .eq("id", row.id);
@@ -490,7 +490,7 @@ async function recordBacktestError(
       ? "failed"
       : getStatusFromPrices(row);
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await database
     .from("final_market_backtests")
     .update({
       last_error: message.slice(0, 2000),
@@ -520,7 +520,7 @@ async function updateDueBacktests(): Promise<{
   ).toISOString();
 
   const { data: rowsRaw, error: rowsError } =
-    await supabase
+    await database
       .from("final_market_backtests")
       .select(
         `

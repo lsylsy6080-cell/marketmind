@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: new URL("..", import.meta.url).pathname,
 
   turbopack: {
-    root: process.cwd(),
+    root: new URL("..", import.meta.url).pathname,
   },
 };
 

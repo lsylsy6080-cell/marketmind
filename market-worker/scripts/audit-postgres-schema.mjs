@@ -22,6 +22,9 @@ function walk(dir) {
 }
 walk(join(root, "src"));
 walk(join(root, "scripts"));
+walk(join(root, "../marketmind-ai/dashboard"));
+walk(join(root, "../marketmind-ai/app"));
+walk(join(root, "../marketmind-ai/lib"));
 
 const tableRefs = new Map();
 const rpcRefs = new Map();
@@ -49,7 +52,7 @@ if (process.argv.includes("--check-db")) {
     return execFileSync("psql", ["-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-d", db, "-c", sql], { encoding: "utf8" })
       .trim().split("\n").filter(Boolean);
   }
-  const actualTables = new Set(query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'"));
+  const actualTables = new Set(query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'"));
   const actualRpc = new Set(query("SELECT DISTINCT routine_name FROM information_schema.routines WHERE routine_schema='public' AND routine_type='FUNCTION'"));
   report.database = db;
   report.missingTables = report.tables.map(x => x.name).filter(x => !actualTables.has(x));

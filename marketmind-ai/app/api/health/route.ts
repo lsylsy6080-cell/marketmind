@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 
 export async function GET() {
   try {
-    const supabase = createAdminClient();
+    const database = createAdminClient();
 
-    const { count, error } = await supabase
+    const { count, error } = await database
       .from("market_candles")
       .select("*", {
         count: "exact",
@@ -16,7 +16,7 @@ export async function GET() {
       return NextResponse.json(
         {
           ok: false,
-          message: "Supabase 조회에 실패했습니다.",
+          message: "Buddy4 PostgreSQL 조회에 실패했습니다.",
           error: error.message,
         },
         { status: 500 },
@@ -25,7 +25,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      message: "Next.js와 Supabase가 정상적으로 연결되었습니다.",
+      message: "Next.js와 Buddy4 PostgreSQL가 정상적으로 연결되었습니다.",
       marketCandleCount: count ?? 0,
       checkedAt: new Date().toISOString(),
     });

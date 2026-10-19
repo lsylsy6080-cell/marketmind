@@ -8,7 +8,7 @@ const root=fileURLToPath(new URL("../../",import.meta.url));
 const found=new Map();
 const fileNames=[];
 function walk(dir){for(const entry of readdirSync(dir,{withFileTypes:true})){if(["node_modules",".git",".next","dist"].includes(entry.name))continue;const p=join(dir,entry.name);if(entry.isDirectory())walk(p);else if([".ts",".tsx",".js",".mjs"].includes(extname(p)))fileNames.push(p)}}
-for(const sub of ["market-worker/src","market-worker/scripts","marketmind-ai/app","marketmind-ai/lib"]) {try{walk(join(root,sub))}catch{}}
+for(const sub of ["market-worker/src","market-worker/scripts","marketmind-ai/app","marketmind-ai/lib","marketmind-ai/dashboard"]) {try{walk(join(root,sub))}catch{}}
 for(const file of fileNames){
  const src=readFileSync(file,"utf8");
  const ref=relative(root,file);

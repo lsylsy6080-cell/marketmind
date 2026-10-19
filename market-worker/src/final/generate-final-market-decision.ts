@@ -1,6 +1,6 @@
 import { loadOnchainContext } from "../onchain/decision-context";
 import { assertFiniteValue, runDecisionEngine, round2 } from "../decision";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 const STRATEGY_VERSION = "final-market-ai-v2.4-onchain-context";
 const SEMANTIC_DEDUP_WINDOW_MINUTES = 5;
@@ -85,7 +85,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
   const {
     data: technicalRaw,
     error: technicalError,
-  } = await supabase
+  } = await database
     .from("market_scores")
     .select(
       `
@@ -123,7 +123,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
   const {
     data: newsRaw,
     error: newsError,
-  } = await supabase
+  } = await database
     .from("news_scores")
     .select(
       `
@@ -163,7 +163,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
   const {
     data: fundingRaw,
     error: fundingError,
-  } = await supabase
+  } = await database
     .from("funding_snapshots")
     .select(
       `
@@ -331,7 +331,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
 
   // 동일한 기술·뉴스·펀딩 입력 조합은 전략 버전별로 한 번만 저장합니다.
   const { data: existingDecision, error: existingDecisionError } =
-    await supabase
+    await database
       .from("final_market_decisions")
       .select("id, decided_at")
       .eq("symbol", "BTCUSDT")
@@ -375,7 +375,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
   const {
     data: recentDecisionRaw,
     error: recentDecisionError,
-  } = await supabase
+  } = await database
     .from("final_market_decisions")
     .select(
       `
@@ -464,7 +464,7 @@ export async function generateFinalMarketDecision(): Promise<void> {
   }
 
   const { error: insertError } =
-    await supabase
+    await database
       .from("final_market_decisions")
       .insert({
         symbol: "BTCUSDT",

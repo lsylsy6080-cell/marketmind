@@ -1,9 +1,9 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { evaluateSafetyPromotion } from "./SafetyPromotionGate";
 import type { Phase89PromotionResult } from "./types";
 
 export async function runPhase89SafetyPromotion():Promise<Phase89PromotionResult>{
-  const {data,error}=await supabase.from("context_performance_snapshots")
+  const {data,error}=await database.from("context_performance_snapshots")
     .select("sample_count,decisive_sample_count,success_rate,average_quality_score,avoided_loss_count,missed_opportunity_count,status")
     .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle();
 
@@ -20,7 +20,7 @@ export async function runPhase89SafetyPromotion():Promise<Phase89PromotionResult
     performanceStatus:x.status,
   });
 
-  const {error:saveError}=await supabase.from("context_promotion_snapshots").insert({
+  const {error:saveError}=await database.from("context_promotion_snapshots").insert({
     symbol:"BTCUSDT",
     calculated_at:new Date().toISOString(),
     status:result.status,

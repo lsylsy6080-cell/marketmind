@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { classifyOpenInterestFlow } from "./OpenInterestIntelligenceEngine";
 import type { OpenInterestSnapshot } from "./types";
 
@@ -18,7 +18,7 @@ async function getJson(url:string){
 
 async function getPastSnapshot(targetMs:number){
   const target=new Date(targetMs).toISOString();
-  const {data,error}=await supabase.from("btc_open_interest_snapshots")
+  const {data,error}=await database.from("btc_open_interest_snapshots")
     .select("fetched_at,price,open_interest")
     .eq("symbol",SYMBOL).lte("fetched_at",target)
     .order("fetched_at",{ascending:false}).limit(1).maybeSingle();
@@ -67,7 +67,7 @@ export async function collectOpenInterestSnapshot():Promise<OpenInterestSnapshot
   };
 
   const bucket=new Date(Math.floor(now.getTime()/60_000)*60_000).toISOString();
-  const {error}=await supabase.from("btc_open_interest_snapshots").upsert({
+  const {error}=await database.from("btc_open_interest_snapshots").upsert({
     symbol:snapshot.symbol,bucket_time:bucket,fetched_at:snapshot.fetchedAt,
     price:snapshot.price,open_interest:snapshot.openInterest,open_interest_value:snapshot.openInterestValue,
     oi_change_5m_percent:snapshot.oiChange5mPercent,oi_change_15m_percent:snapshot.oiChange15mPercent,

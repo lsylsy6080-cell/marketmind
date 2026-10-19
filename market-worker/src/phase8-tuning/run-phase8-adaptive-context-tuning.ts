@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { buildAdaptiveContextTuningCandidate } from "./AdaptiveContextTuner";
 import type { Phase810TuningCandidate } from "./types";
 
@@ -10,10 +10,10 @@ const DEFAULTS={
 
 export async function runPhase810AdaptiveContextTuning():Promise<Phase810TuningCandidate>{
   const [promotion,performance]=await Promise.all([
-    supabase.from("context_promotion_snapshots")
+    database.from("context_promotion_snapshots")
       .select("eligible,status")
       .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
-    supabase.from("context_performance_snapshots")
+    database.from("context_performance_snapshots")
       .select("status,success_rate,average_quality_score,avoided_loss_count,missed_opportunity_count")
       .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
   ]);
@@ -34,7 +34,7 @@ export async function runPhase810AdaptiveContextTuning():Promise<Phase810TuningC
     current:DEFAULTS,
   });
 
-  const {error:saveError}=await supabase.from("context_tuning_candidates").insert({
+  const {error:saveError}=await database.from("context_tuning_candidates").insert({
     symbol:"BTCUSDT",
     calculated_at:new Date().toISOString(),
     status:result.status,

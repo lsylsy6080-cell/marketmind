@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { HistoricalDecisionObservation } from "./StrategyCandidateComparator";
 import { validateStrategyCandidatesWalkForward } from "./StrategyWalkForwardValidator";
 
@@ -23,7 +23,7 @@ export async function runStrategyWalkForwardValidation(
   }
 
   const lastBacktestId = observations.at(-1)?.id ?? null;
-  const { data: latest, error: latestError } = await supabase
+  const { data: latest, error: latestError } = await database
     .from("strategy_validation_results")
     .select("validation_run_id, source_observation_count, source_last_backtest_id")
     .order("analyzed_at", { ascending: false })
@@ -78,7 +78,7 @@ export async function runStrategyWalkForwardValidation(
     analyzed_at: analyzedAt,
   }));
 
-  const { error } = await supabase
+  const { error } = await database
     .from("strategy_validation_results")
     .insert(rows);
 

@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 type Direction =
   | "bullish"
@@ -277,7 +277,7 @@ export async function generateBtcFundingSnapshot(): Promise<void> {
         ).toISOString()
       : null;
 
-  const { error } = await supabase
+  const { error } = await database
     .from("funding_snapshots")
     .insert({
       symbol: raw.symbol,

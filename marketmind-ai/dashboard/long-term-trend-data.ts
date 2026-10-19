@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 
 export type LongTermTrendSnapshot = {
   id: number;
@@ -57,8 +57,8 @@ function map(row: any): LongTermTrendSnapshot {
 
 export async function getLongTermTrendData() {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const database = createAdminClient();
+    const { data, error } = await database
       .from("long_term_trend_snapshots")
       .select("*")
       .order("snapshot_hour", { ascending: false })

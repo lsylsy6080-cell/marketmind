@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "../lib/database/admin";
 
 export type BattleMetrics = {
   totalTrades: number;
@@ -41,22 +41,7 @@ export type FixedAdaptiveBattleData = {
   error: string | null;
 };
 
-function getSupabase() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SECRET_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase 환경변수가 설정되지 않았습니다.");
-  }
-
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+function getDatabase() { return createAdminClient(); }
 
 const asMetrics = (value: unknown): BattleMetrics | null => {
   if (!value || typeof value !== "object") return null;
@@ -83,18 +68,18 @@ export async function getFixedAdaptiveBattleData(): Promise<FixedAdaptiveBattleD
   };
 
   try {
-    const supabase = getSupabase();
+    const database = getDatabase();
 
     const [{ data: snapshot, error: snapshotError }, { data: config, error: configError }] =
       await Promise.all([
-        supabase
+        database
           .from("adaptive_battle_snapshots")
           .select("status,winner,fixed_metrics,adaptive_metrics,fixed_score,adaptive_score,reasons,analyzed_at")
           .eq("symbol", "BTCUSDT")
           .order("analyzed_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase
+        database
           .from("adaptive_battle_configs")
           .select("minimum_trades")
           .eq("symbol", "BTCUSDT")

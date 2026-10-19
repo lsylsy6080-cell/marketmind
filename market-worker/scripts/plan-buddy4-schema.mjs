@@ -12,7 +12,7 @@ const root=fileURLToPath(new URL("../../",import.meta.url));
 const files=[];
 const ignored=new Set(["node_modules",".git",".next","dist","build"]);
 function walk(dir){for(const entry of readdirSync(dir,{withFileTypes:true})){if(ignored.has(entry.name))continue;const path=join(dir,entry.name);if(entry.isDirectory())walk(path);else if([".ts",".tsx",".js",".mjs"].includes(extname(path)))files.push(path)}}
-for(const dir of ["market-worker/src","market-worker/scripts","marketmind-ai/app","marketmind-ai/lib","marketmind-ai/components"]){try{walk(join(root,dir))}catch{}}
+for(const dir of ["market-worker/src","market-worker/scripts","marketmind-ai/app","marketmind-ai/lib","marketmind-ai/components","marketmind-ai/dashboard"]){try{walk(join(root,dir))}catch{}}
 const tables=new Map(),rpcs=new Map();
 function record(map,key,file){let r=map.get(key);if(!r){r={name:key,files:new Set(),columns:new Set(),conflictKeys:new Set(),operations:new Set(),dynamicWrites:[],unknowns:[]};map.set(key,r)}r.files.add(file);return r}
 for(const file of files){
@@ -40,7 +40,8 @@ for(const file of files){
  }
  for(const m of content.matchAll(/\.rpc\s*\(\s*["']([A-Za-z_]\w*)["']/g))record(rpcs,m[1],rel);
 }
-const known=new Set(["onchain_snapshots","market_candles","technical_snapshots","market_scores"]);
+const contract=JSON.parse(readFileSync(join(root,"market-worker/migrations/buddy4/schema-contract.json"),"utf8"));
+const known=new Set([...contract.tables.map(t=>t.name),...contract.views,...contract.rpcs]);
 function normalize(r){return [...r.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>({name:x.name,existingMigration:known.has(x.name),sourceFiles:[...x.files].sort(),candidateColumns:[...x.columns].sort(),upsertConflictKeys:[...x.conflictKeys].sort(),operations:[...x.operations].sort(),dynamicWriteVariables:[...new Set(x.dynamicWrites)].sort(),requiresManualReview:true}))}
 const list=normalize(tables);
 console.log(JSON.stringify({warning:"PLANNING REPORT ONLY. Candidate columns are heuristics and may contain nested keys or miss .select([...].join()), spread/dynamic payloads and RPC side effects. DO NOT auto-generate production SQL from this report.",sourceFilesScanned:files.length,tableReferences:list.length,notYetMigrated:list.filter(x=>!x.existingMigration).length,tables:list,rpcs:normalize(rpcs)},null,2));

@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 import type { DashboardData, MarketIntelligenceRow } from "./types";
 
 const SELECT_COLUMNS = [
@@ -24,8 +24,8 @@ const SELECT_COLUMNS = [
 
 export async function getMarketIntelligenceDashboardData(): Promise<DashboardData> {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const database = createAdminClient();
+    const { data, error } = await database
       .from("market_intelligence_scores")
       .select(SELECT_COLUMNS)
       .eq("symbol", "BTCUSDT")

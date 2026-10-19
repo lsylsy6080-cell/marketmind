@@ -1,4 +1,4 @@
-import { createAdminClient } from "../lib/supabase/admin";
+import { createAdminClient } from "../lib/database/admin";
 import type {
   OptimizationStatusData,
   OptimizationStatusRow,
@@ -6,8 +6,8 @@ import type {
 
 export async function getOptimizationStatusData(): Promise<OptimizationStatusData> {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const database = createAdminClient();
+    const { data, error } = await database
       .from("latest_strategy_optimization_status")
       .select("*")
       .maybeSingle();

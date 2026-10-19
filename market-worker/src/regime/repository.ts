@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { MarketRegimeResult, RegimeTimeframe } from "./types";
 import type { Candle } from "../indicators/technical";
 
@@ -21,7 +21,7 @@ export async function loadRegimeCandles(
   timeframe: RegimeTimeframe,
   limit = 300,
 ): Promise<Candle[]> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("market_candles")
     .select("open_time,open,high,low,close,volume")
     .eq("exchange", "binance")
@@ -46,7 +46,7 @@ export async function loadRegimeCandles(
 }
 
 export async function saveMarketRegime(result: MarketRegimeResult): Promise<void> {
-  const { error } = await supabase.from("market_regime_snapshots").upsert(
+  const { error } = await database.from("market_regime_snapshots").upsert(
     {
       symbol: result.symbol,
       bucket_time: result.bucketTime,

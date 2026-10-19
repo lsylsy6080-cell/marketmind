@@ -1,0 +1,33 @@
+name: Buddy4 PostgreSQL validation
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.2
+        env:
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: marketmind_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d marketmind_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix packages/database
+      - run: npm ci --prefix market-worker
+      - run: npm ci --prefix marketmind-ai
+      - run: npm run typecheck --prefix market-worker
+      - run: npm run buddy4:test --prefix market-worker
+        env:
+          BUDDY4_TEST_DATABASE_URL: postgres://postgres:local-test-only@127.0.0.1:5432/marketmind_test
+      - run: node market-worker/scripts/run-engine-tests.mjs
+      - run: npm run build --prefix marketmind-ai
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

@@ -1,23 +1,14 @@
-# Bulk schema reconstruction (66 remaining tables + RPC)
+# Bulk reconstruction and acceptance gates
 
-This workstream batches **discovery and reconciliation** before writing DDL. The repository does not contain Supabase's complete schema; do not guess types or assume a table with a matching name is compatible.
+The implementation now contains 66 ordinary tables, 6 views, and 8 RPCs. Five ordinary tables were already present on Buddy4, so `005_remaining_tables.sql` defines 61 additional tables.
 
-## Generate one report for all tables and functions
-From `market-worker` in the separate Buddy4 checkout:
+Use `schema-contract.json` for explicit field/type/default/unique/FK evidence, `source-contracts.json` for TypeScript-discovered usage, and `SCHEMA-DECISIONS.md` for assumptions. These files are not a recovered Supabase catalog.
 
-```sh
-node scripts/plan-buddy4-schema.mjs > "$HOME/buddy4-schema-plan.json"
-node -e "const p=require(process.env.HOME+'/buddy4-schema-plan.json');console.log({scanned:p.sourceFilesScanned,tables:p.tableReferences,remaining:p.notYetMigrated,rpcs:p.rpcs.length})"
-```
+1. Validate source contracts and existing engine tests locally.
+2. Run schema, query, API, RPC accounting/concurrency and pipeline tests on PostgreSQL 18.2.
+3. On Buddy4, capture the actual five-table schema, back up, and restore to a separate `_restore` DB.
+4. Apply with `migrate-buddy4.ts` only to the test/restore DB; inspect drift and data retention.
+5. Configure and test separate worker/read-only API credentials, HTTPS, and Vercel Preview.
+6. Only after operator acceptance, plan production application and PM2 changes separately.
 
-All entries are **candidate clues only**. Source parsing cannot determine types, `NOT NULL`, defaults, composite keys, FK references, SQL function bodies, PostgREST grants, triggers, policy definitions, or dynamic payloads with full certainty. The tool does not write any database object.
-
-## Acceptance gate before all-at-once migration
-- Each table has independently reviewed DDL based on all writer payloads and reader queries.
-- All `onConflict` columns have matching unique or primary constraints.
-- Every invoked RPC has matching name, argument signature, function semantics and permissions.
-- Test DB restores all previously validated migrations; new batch DDL applies atomically with `ON_ERROR_STOP=1` or is rolled back.
-- Integration tests cover worker jobs, Next.js API responses, authentication and private HTTPS access.
-- No production PM2, Vercel env or main branch edits prior to sign-off.
-
-Use a **dedicated temporary database** for the batch tests, not the running `marketmind` DB. The existing `market_candles` collector must keep running during development.
+Detailed commands: [docs/buddy4-migration.md](../../../docs/buddy4-migration.md). No automatic production application, branch merge, destructive down migration or boot configuration change is part of this work.

@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { runPhase86ContextExecutionGuard } from "../phase8-execution-guard/run-phase8-context-execution-guard";
 import {
   buildAdaptiveExecutionPlan,
@@ -58,7 +58,7 @@ async function fetchPrice(symbol:string):Promise<number>{
 }
 
 async function getBaseConfig():Promise<ConfigRow|null>{
-  const {data,error}=await supabase.from("paper_strategy_configs")
+  const {data,error}=await database.from("paper_strategy_configs")
     .select("id,account_id,symbol,max_holding_minutes")
     .eq("is_active",true).eq("symbol","BTCUSDT").order("id",{ascending:true}).limit(1).maybeSingle();
   if(error) throw new Error(`[Adaptive Paper] config 조회 실패: ${error.message}`);
@@ -66,19 +66,19 @@ async function getBaseConfig():Promise<ConfigRow|null>{
 }
 
 async function ensureAccount(baseAccountId:number):Promise<AdaptiveAccount>{
-  const existing=await supabase.from("adaptive_paper_accounts")
+  const existing=await database.from("adaptive_paper_accounts")
     .select("id,base_account_id,initial_balance,cash_balance")
     .eq("base_account_id",baseAccountId).maybeSingle();
   if(existing.error) throw new Error(`[Adaptive Paper] account 조회 실패: ${existing.error.message}`);
   if(existing.data) return existing.data as AdaptiveAccount;
 
-  const base=await supabase.from("paper_trading_accounts")
+  const base=await database.from("paper_trading_accounts")
     .select("id,cash_balance").eq("id",baseAccountId).single();
   if(base.error||!base.data) throw new Error(`[Adaptive Paper] base account 조회 실패: ${base.error?.message??"없음"}`);
   const balance=num(base.data.cash_balance);
   if(balance<=0) throw new Error("[Adaptive Paper] base account balance <= 0");
 
-  const inserted=await supabase.from("adaptive_paper_accounts").insert({
+  const inserted=await database.from("adaptive_paper_accounts").insert({
     base_account_id:baseAccountId,initial_balance:balance,cash_balance:balance,
   }).select("id,base_account_id,initial_balance,cash_balance").single();
   if(inserted.error||!inserted.data) throw new Error(`[Adaptive Paper] account 생성 실패: ${inserted.error?.message??"없음"}`);
@@ -86,7 +86,7 @@ async function ensureAccount(baseAccountId:number):Promise<AdaptiveAccount>{
 }
 
 async function getLatestV2():Promise<V2Row|null>{
-  const {data,error}=await supabase.from("ai_decision_v2_snapshots")
+  const {data,error}=await database.from("ai_decision_v2_snapshots")
     .select("id,direction,calculated_at,entry_plan,entry_trigger,strategy_version,trading_permission,squeeze_warning_snapshot_id,squeeze_warning_status,squeeze_long_phase,squeeze_short_phase,squeeze_permission_override")
     .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle();
   if(error) throw new Error(`[Adaptive Paper] V2 조회 실패: ${error.message}`);
@@ -97,7 +97,7 @@ async function getSqueezeWarning(v2:V2Row|null):Promise<AdaptiveSqueezeWarning|n
   const snapshotId=num(v2?.squeeze_warning_snapshot_id);
   if(!v2 || snapshotId<=0 || v2.squeeze_warning_status!=="active") return null;
 
-  const {data,error}=await supabase.from("squeeze_early_warning_snapshots")
+  const {data,error}=await database.from("squeeze_early_warning_snapshots")
     .select("id,calculated_at,long_phase,short_phase,long_alert_score,short_alert_score")
     .eq("id",snapshotId).maybeSingle();
   if(error) throw new Error(`[Adaptive Paper] squeeze warning 조회 실패: ${error.message}`);
@@ -124,7 +124,7 @@ async function getSqueezeWarning(v2:V2Row|null):Promise<AdaptiveSqueezeWarning|n
 }
 
 async function getSizing(decisionV2Id:number):Promise<SizingRow|null>{
-  const {data,error}=await supabase.from("adaptive_position_sizing_snapshots")
+  const {data,error}=await database.from("adaptive_position_sizing_snapshots")
     .select("id,decision_v2_id,sizing_status,margin_percent,leverage,sizing_score,risk_tier,apply_mode")
     .eq("decision_v2_id",decisionV2Id).order("calculated_at",{ascending:false}).limit(1).maybeSingle();
   if(error) throw new Error(`[Adaptive Paper] sizing 조회 실패: ${error.message}`);
@@ -132,7 +132,7 @@ async function getSizing(decisionV2Id:number):Promise<SizingRow|null>{
 }
 
 async function getOpenPosition(accountId:number):Promise<AdaptivePosition|null>{
-  const {data,error}=await supabase.from("adaptive_paper_positions")
+  const {data,error}=await database.from("adaptive_paper_positions")
     .select("id,account_id,base_config_id,symbol,side,quantity,entry_price,stop_loss_price,take_profit_price,margin_amount,notional_amount,opened_at,requested_leverage,estimated_liquidation_price,liquidation_distance_percent,liquidation_safety_buffer_percent,liquidation_safety_status,maintenance_margin_rate_percent,leverage_adjusted")
     .eq("account_id",accountId).eq("symbol","BTCUSDT").eq("status","open").limit(1).maybeSingle();
   if(error) throw new Error(`[Adaptive Paper] open position 조회 실패: ${error.message}`);
@@ -146,10 +146,10 @@ async function saveEquitySnapshot(account:AdaptiveAccount,position:AdaptivePosit
     const q=num(position.quantity),entry=num(position.entry_price);
     unrealized=position.side==="long" ? (marketPrice-entry)*q : (entry-marketPrice)*q;
   }
-  const fresh=await supabase.from("adaptive_paper_accounts").select("cash_balance").eq("id",account.id).single();
+  const fresh=await database.from("adaptive_paper_accounts").select("cash_balance").eq("id",account.id).single();
   if(fresh.error) throw new Error(`[Adaptive Paper] equity account refresh 실패: ${fresh.error.message}`);
   const cash=num(fresh.data.cash_balance);
-  const {error}=await supabase.from("adaptive_paper_equity_snapshots").insert({
+  const {error}=await database.from("adaptive_paper_equity_snapshots").insert({
     account_id:account.id,symbol:"BTCUSDT",cash_balance:round(cash),
     reserved_margin:round(margin),unrealized_pnl:round(unrealized),
     equity:round(cash+margin+unrealized),market_price:marketPrice,
@@ -194,7 +194,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     }
 
     if(!closeReason && squeezeProtection.action==="tighten_stop" && squeezeProtection.newStopLossPrice!=null){
-      const {error:protectError}=await supabase.from("adaptive_paper_positions").update({
+      const {error:protectError}=await database.from("adaptive_paper_positions").update({
         stop_loss_price:squeezeProtection.newStopLossPrice,
         squeeze_warning_snapshot_id:squeezeWarning?.snapshotId??null,
         squeeze_phase:squeezeProtection.relevantPhase,
@@ -225,14 +225,14 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
       };
     }
 
-    const {data,error}=await supabase.rpc("adaptive_paper_close_position_v1",{
+    const {data,error}=await database.rpc("adaptive_paper_close_position_v1",{
       p_position_id:open.id,p_market_price:marketPrice,p_close_reason:closeReason,
       p_fee_rate_percent:FEE_RATE_PERCENT,
     });
     if(error) throw new Error(`[Adaptive Paper] close RPC 실패: ${error.message}`);
     const result=(data??{}) as any;
     if(result.status==="closed" && result.trade_id){
-      const {error:tradeMetaError}=await supabase.from("adaptive_paper_trades").update({
+      const {error:tradeMetaError}=await database.from("adaptive_paper_trades").update({
         requested_leverage:open.requested_leverage,
         estimated_liquidation_price:open.estimated_liquidation_price,
         liquidation_distance_percent:open.liquidation_distance_percent,
@@ -301,7 +301,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
   if(invalidationPrice<=0) return {action:"skipped",reason:"고정 invalidation price가 없습니다."};
 
   // 실제 Adaptive 계정의 현재 cash를 기준으로 margin 금액을 다시 계산합니다.
-  const freshAccount=await supabase.from("adaptive_paper_accounts")
+  const freshAccount=await database.from("adaptive_paper_accounts")
     .select("cash_balance").eq("id",account.id).single();
   if(freshAccount.error) throw new Error(`[Adaptive Paper] cash refresh 실패: ${freshAccount.error.message}`);
   const equityForSizing=num(freshAccount.data.cash_balance);
@@ -317,7 +317,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     liquidationSafetyBufferPercent:LIQUIDATION_SAFETY_BUFFER_PERCENT,
   });
 
-  const {data,error}=await supabase.rpc("adaptive_paper_open_position_v1",{
+  const {data,error}=await database.rpc("adaptive_paper_open_position_v1",{
     p_account_id:account.id,p_base_config_id:config.id,p_symbol:"BTCUSDT",
     p_side:plan.side,p_decision_v2_id:v2.id,p_sizing_snapshot_id:sizing.id,
     p_entry_price:plan.entryPrice,p_stop_loss_price:plan.stopLossPrice,
@@ -334,7 +334,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
     return {action:"skipped",reason:String(result.reason??"adaptive open skipped"),plan};
   }
 
-  const {error:liqMetaError}=await supabase.from("adaptive_paper_positions").update({
+  const {error:liqMetaError}=await database.from("adaptive_paper_positions").update({
     requested_leverage:plan.requestedLeverage,
     estimated_liquidation_price:plan.estimatedLiquidationPrice,
     liquidation_distance_percent:plan.liquidationDistancePercent,
@@ -351,7 +351,7 @@ export async function runAdaptivePaperTrading():Promise<AdaptivePaperSummary>{
   }).eq("id",num(result.position_id));
   if(liqMetaError) throw new Error(`[Adaptive Paper] liquidation metadata 저장 실패: ${liqMetaError.message}`);
 
-  await supabase.from("adaptive_position_sizing_snapshots")
+  await database.from("adaptive_position_sizing_snapshots")
     .update({apply_mode:"paper_apply"}).eq("id",sizing.id);
 
   const created=await getOpenPosition(account.id);

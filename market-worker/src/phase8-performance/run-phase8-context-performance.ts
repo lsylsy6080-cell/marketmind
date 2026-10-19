@@ -1,9 +1,9 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { evaluateContextPerformance } from "./ContextPerformanceMonitor";
 import type { ContextOutcomeSample, Phase88ContextPerformanceResult } from "./types";
 
 export async function runPhase88ContextPerformance():Promise<Phase88ContextPerformanceResult>{
-  const {data,error}=await supabase.from("context_execution_outcome_snapshots")
+  const {data,error}=await database.from("context_execution_outcome_snapshots")
     .select("outcome_label,quality_score,directional_return_percent,permission")
     .eq("symbol","BTCUSDT")
     .order("calculated_at",{ascending:false})
@@ -20,7 +20,7 @@ export async function runPhase88ContextPerformance():Promise<Phase88ContextPerfo
 
   const result=evaluateContextPerformance(samples);
 
-  const {error:saveError}=await supabase.from("context_performance_snapshots").insert({
+  const {error:saveError}=await database.from("context_performance_snapshots").insert({
     symbol:"BTCUSDT",
     calculated_at:new Date().toISOString(),
     sample_count:result.sampleCount,

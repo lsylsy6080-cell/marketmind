@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 type BinanceInterval = "5m" | "15m" | "1h" | "4h" | "1d";
 type BinanceKline = [number,string,string,string,string,string,number,string,number,string,string,string];
@@ -25,7 +25,7 @@ async function saveInterval(interval: BinanceInterval, limit: number): Promise<n
     taker_buy_base_volume:k[9], taker_buy_quote_volume:k[10], is_closed:true,
   }));
   if (!rows.length) return 0;
-  const { error } = await supabase.from("market_candles").upsert(rows,{onConflict:"exchange,market_type,symbol,timeframe,open_time",ignoreDuplicates:false});
+  const { error } = await database.from("market_candles").upsert(rows,{onConflict:"exchange,market_type,symbol,timeframe,open_time",ignoreDuplicates:false});
   if (error) throw new Error(`[futures-timeframe] ${interval} 저장 실패: ${error.message}`);
   return rows.length;
 }

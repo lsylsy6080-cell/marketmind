@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 const PERFORMANCE_BATCH_SIZE = 100;
 const DEFAULT_THRESHOLD_PERCENT = 0.1;
@@ -199,7 +199,7 @@ function buildEvaluationReason(
 async function getCompletedBacktests(): Promise<
   CompletedBacktestRow[]
 > {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("final_market_backtests")
     .select(
       `
@@ -235,7 +235,7 @@ async function getExistingBacktestIds(
     return new Set<number>();
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("final_market_performance")
     .select("backtest_id")
     .in("backtest_id", backtestIds);
@@ -248,7 +248,7 @@ async function getExistingBacktestIds(
 
   return new Set(
     (data ?? []).map(
-      (row: { backtest_id: number }) =>
+      (row) =>
         Number(row.backtest_id),
     ),
   );
@@ -257,7 +257,7 @@ async function getExistingBacktestIds(
 async function getDecision(
   decisionId: number,
 ): Promise<FinalDecisionRow> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("final_market_decisions")
     .select(
       `
@@ -352,7 +352,7 @@ async function evaluateOneBacktest(
       actionResult,
     );
 
-  const { error } = await supabase
+  const { error } = await database
     .from("final_market_performance")
     .upsert(
       {

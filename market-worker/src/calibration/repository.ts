@@ -1,17 +1,17 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { SignalCalibrationResult } from "./types";
 
 export async function loadCalibrationRows(windowHours = 168) {
   const cutoff = new Date(Date.now() - windowHours * 3_600_000).toISOString();
   const [news, funding] = await Promise.all([
-    supabase
+    database
       .from("news_scores")
       .select("calculated_at,article_count,unique_article_count,weighted_score,confidence,direction")
       .eq("symbol", "BTCUSDT")
       .gte("calculated_at", cutoff)
       .order("calculated_at", { ascending: true })
       .limit(5000),
-    supabase
+    database
       .from("funding_snapshots")
       .select("fetched_at,funding_rate,score,confidence,direction,risk_level,trading_permission")
       .eq("symbol", "BTCUSDT")
@@ -26,7 +26,7 @@ export async function loadCalibrationRows(windowHours = 168) {
 }
 
 export async function saveCalibrationSnapshot(result: SignalCalibrationResult): Promise<void> {
-  const { error } = await supabase.from("signal_calibration_snapshots").insert({
+  const { error } = await database.from("signal_calibration_snapshots").insert({
     symbol: result.symbol,
     calculated_at: result.calculatedAt,
     window_hours: result.windowHours,

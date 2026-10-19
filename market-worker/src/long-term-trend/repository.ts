@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { TrendCandle, TrendSummary } from "./engine";
 
 export type StoredTrendTimeframe = "4h" | "1d" | "1w";
@@ -101,7 +101,7 @@ export async function loadTrendCandles(
   for (let offset = 0; offset < targetCount; offset += pageSize) {
     const end = Math.min(targetCount, offset + pageSize) - 1;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from("market_candles")
       .select("open_time,open,high,low,close,volume")
       .eq("exchange", "binance")
@@ -135,7 +135,7 @@ export async function loadTrendCandles(
 }
 
 export async function getLatestSpotPrice(): Promise<number> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("market_candles")
     .select("close")
     .eq("exchange", "binance")
@@ -163,7 +163,7 @@ export async function findSnapshotId(
   engineVersion: string,
   snapshotHour: string,
 ): Promise<number | null> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("long_term_trend_snapshots")
     .select("id")
     .eq("exchange", "binance")
@@ -186,7 +186,7 @@ export async function findSnapshotId(
 export async function insertSnapshot(
   row: LongTermTrendSnapshotInsert,
 ): Promise<number> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("long_term_trend_snapshots")
     .upsert(row, {
       onConflict: "exchange,market_type,symbol,engine_version,snapshot_hour",

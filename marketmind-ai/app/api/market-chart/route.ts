@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,10 +25,10 @@ export async function GET(request:NextRequest){
  if(!ALLOWED_INTERVALS.has(interval)||symbol!=="BTCUSDT")return NextResponse.json({ok:false,error:"지원하지 않는 심볼 또는 시간봉입니다."},{status:400});
  const limit=Number.isFinite(rawLimit)?Math.min(MAX_LIMIT,Math.max(1,Math.floor(rawLimit))):DEFAULT_LIMIT;
  try{
-  const supabase=createAdminClient();
+  const database=createAdminClient();
   const queryInterval=interval==="1M"?"1d":interval;
   const queryLimit=interval==="1M"?Math.min(5000,limit*35+35):limit+1;
-  let query=supabase.from("market_candles").select("open_time,open,high,low,close,volume").eq("exchange","binance").eq("market_type","spot").eq("symbol",symbol).eq("timeframe",queryInterval).eq("is_closed",true).order("open_time",{ascending:false}).limit(queryLimit);
+  let query=database.from("market_candles").select("open_time,open,high,low,close,volume").eq("exchange","binance").eq("market_type","spot").eq("symbol",symbol).eq("timeframe",queryInterval).eq("is_closed",true).order("open_time",{ascending:false}).limit(queryLimit);
   if(Number.isFinite(rawEndTime)&&rawEndTime>0)query=query.lt("open_time",new Date(rawEndTime).toISOString());
   const {data,error}=await query;if(error)throw error;
   const rows=(data??[]) as MarketCandleRow[];
@@ -38,10 +38,10 @@ export async function GET(request:NextRequest){
     const hasMore=monthly.length>limit || rows.length>=queryLimit;
     monthly=monthly.slice(Math.max(0,monthly.length-limit));
     if(!monthly.length)return NextResponse.json({ok:false,error:"월봉 생성을 위한 일봉 데이터가 없습니다."},{status:404,headers:{"Cache-Control":"no-store"}});
-    return NextResponse.json({ok:true,symbol,interval,candles:monthly,hasMore,source:"supabase:1d:monthly-aggregate",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=30, stale-while-revalidate=60"}});
+    return NextResponse.json({ok:true,symbol,interval,candles:monthly,hasMore,source:"database:1d:monthly-aggregate",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=30, stale-while-revalidate=60"}});
   }
   const hasMore=rows.length>limit;const selected=rows.slice(0,limit);const candles=selected.map(toCandle).filter(valid).reverse();
-  if(!candles.length)return NextResponse.json({ok:false,error:`Supabase market_candles에 ${symbol} ${interval} 데이터가 없습니다.`},{status:404,headers:{"Cache-Control":"no-store"}});
-  return NextResponse.json({ok:true,symbol,interval,candles,hasMore,source:`supabase:${interval}:direct`,fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=10, stale-while-revalidate=30"}});
- }catch(error){console.error("[market-chart] query failed",error);return NextResponse.json({ok:false,error:error instanceof Error?`Supabase 차트 조회 실패: ${error.message}`:"Supabase 차트 데이터를 불러오지 못했습니다."},{status:502,headers:{"Cache-Control":"no-store"}})}
+  if(!candles.length)return NextResponse.json({ok:false,error:`Buddy4 PostgreSQL market_candles에 ${symbol} ${interval} 데이터가 없습니다.`},{status:404,headers:{"Cache-Control":"no-store"}});
+  return NextResponse.json({ok:true,symbol,interval,candles,hasMore,source:`database:${interval}:direct`,fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=10, stale-while-revalidate=30"}});
+ }catch(error){console.error("[market-chart] query failed",error);return NextResponse.json({ok:false,error:error instanceof Error?`Buddy4 PostgreSQL 차트 조회 실패: ${error.message}`:"Buddy4 PostgreSQL 차트 데이터를 불러오지 못했습니다."},{status:502,headers:{"Cache-Control":"no-store"}})}
 }

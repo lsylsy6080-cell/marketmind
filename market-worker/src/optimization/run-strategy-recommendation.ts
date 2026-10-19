@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { recommendStrategy } from "./StrategyRecommendationEngine";
 import type { WalkForwardValidationResult } from "./StrategyWalkForwardValidator";
 
@@ -13,7 +13,7 @@ export async function runStrategyRecommendation(params: {
     return;
   }
 
-  const { data: existing, error: existingError } = await supabase
+  const { data: existing, error: existingError } = await database
     .from("strategy_recommendations")
     .select("id")
     .eq("source_validation_run_id", params.validationRunId)
@@ -33,7 +33,7 @@ export async function runStrategyRecommendation(params: {
     (result) =>
       result.candidate.key === recommendation.selectedCandidateKey,
   );
-  const { error } = await supabase.from("strategy_recommendations").insert({
+  const { error } = await database.from("strategy_recommendations").insert({
     source_validation_run_id: params.validationRunId,
     recommendation_status: recommendation.status,
     selected_candidate_key: recommendation.selectedCandidateKey,

@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { MarketRegime } from "../regime/types";
 import type { AdvisorWeights, ComponentPerformanceSample, WeightAdvisorResult } from "./types";
 
@@ -22,7 +22,7 @@ const numberOf = (value: unknown, label: string): number => {
 };
 
 export async function loadCurrentRegimeAndBaseline(): Promise<{ regime: MarketRegime; baseline: AdvisorWeights }> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("market_regime_snapshots")
     .select("regime")
     .eq("symbol", "BTCUSDT")
@@ -52,7 +52,7 @@ export async function loadCurrentRegimeAndBaseline(): Promise<{ regime: MarketRe
 }
 
 export async function loadPerformanceSamples(limit = 200): Promise<ComponentPerformanceSample[]> {
-  const { data: performanceData, error: performanceError } = await supabase
+  const { data: performanceData, error: performanceError } = await database
     .from("final_market_performance")
     .select("decision_id,market_return,evaluated_at")
     .eq("symbol", "BTCUSDT")
@@ -66,7 +66,7 @@ export async function loadPerformanceSamples(limit = 200): Promise<ComponentPerf
   const decisionIds = [...new Set(performances.map((row) => Number(row.decision_id)).filter(Number.isFinite))];
   if (decisionIds.length === 0) return [];
 
-  const { data: decisionData, error: decisionError } = await supabase
+  const { data: decisionData, error: decisionError } = await database
     .from("final_market_decisions")
     .select("id,technical_score,news_score,funding_score")
     .in("id", decisionIds);
@@ -95,7 +95,7 @@ export async function loadPerformanceSamples(limit = 200): Promise<ComponentPerf
 }
 
 export async function saveWeightAdvice(result: WeightAdvisorResult): Promise<void> {
-  const { error } = await supabase.from("adaptive_weight_advisor_snapshots").insert({
+  const { error } = await database.from("adaptive_weight_advisor_snapshots").insert({
     symbol: result.symbol,
     calculated_at: result.calculatedAt,
     regime: result.regime,

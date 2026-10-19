@@ -3,7 +3,7 @@
     "etf:collect": "tsx scripts/run-etf-collector.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.0",
+    "@marketmind/database": "file:../../packages/database",
     "dotenv": "^16.4.7"
   },
   "devDependencies": {

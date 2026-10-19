@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 const WORKER_NAME = "market-worker-main";
 
@@ -70,7 +70,7 @@ export class WorkerExecutionTracker {
 
   async start(): Promise<boolean> {
     const acquired = await withNetworkRetry("워커 잠금 획득", async () => {
-      const { data, error } = await supabase.rpc("acquire_worker_lock_v2", {
+      const { data, error } = await database.rpc("acquire_worker_lock_v2", {
         p_worker_name: WORKER_NAME,
         p_run_id: this.runId,
         p_ttl_seconds: LOCK_TTL_SECONDS,
@@ -86,7 +86,7 @@ export class WorkerExecutionTracker {
       // 이전 네트워크/프로세스 단절로 running 이력이 남아 있어도 현재 실행을 막지 않습니다.
       try {
         await withNetworkRetry("stale 실행이력 정리", async () => {
-          const { error } = await supabase.rpc("mark_stale_worker_runs_v1", {
+          const { error } = await database.rpc("mark_stale_worker_runs_v1", {
             p_worker_name: WORKER_NAME,
             p_stale_minutes: 10,
           });
@@ -97,7 +97,7 @@ export class WorkerExecutionTracker {
       }
 
       const row = await withNetworkRetry("워커 실행 기록 생성", async () => {
-        const { data, error } = await supabase
+        const { data, error } = await database
           .from("worker_execution_runs")
           .insert({
             run_id: this.runId,
@@ -142,7 +142,7 @@ export class WorkerExecutionTracker {
 
     try {
       const renewed = await withNetworkRetry("워커 heartbeat", async () => {
-        const { data, error } = await supabase.rpc("heartbeat_worker_lock_v2", {
+        const { data, error } = await database.rpc("heartbeat_worker_lock_v2", {
           p_worker_name: WORKER_NAME,
           p_run_id: this.runId,
           p_ttl_seconds: LOCK_TTL_SECONDS,
@@ -171,7 +171,7 @@ export class WorkerExecutionTracker {
     const stageStartedAt = Date.now();
 
     const data = await withNetworkRetry(`${label} 단계 기록 시작`, async () => {
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from("worker_execution_stages")
         .insert({
           execution_run_id: this.runRowId,
@@ -190,7 +190,7 @@ export class WorkerExecutionTracker {
 
       try {
         await withNetworkRetry(`${label} 단계 완료 기록`, async () => {
-          const { error } = await supabase
+          const { error } = await database
             .from("worker_execution_stages")
             .update({
               status: "completed",
@@ -208,7 +208,7 @@ export class WorkerExecutionTracker {
       const message = errorMessage(stageError);
       try {
         await withNetworkRetry(`${label} 단계 실패 기록`, async () => {
-          const { error } = await supabase
+          const { error } = await database
             .from("worker_execution_stages")
             .update({
               status: "failed",
@@ -239,7 +239,7 @@ export class WorkerExecutionTracker {
     if (this.runRowId !== null) {
       try {
         await withNetworkRetry("워커 실행 종료 기록", async () => {
-          const { error: updateError } = await supabase
+          const { error: updateError } = await database
             .from("worker_execution_runs")
             .update({
               status: message ? "failed" : "completed",
@@ -263,7 +263,7 @@ export class WorkerExecutionTracker {
 
     try {
       await withNetworkRetry("워커 잠금 해제", async () => {
-        const { data, error } = await supabase.rpc("release_worker_lock_v2", {
+        const { data, error } = await database.rpc("release_worker_lock_v2", {
           p_worker_name: WORKER_NAME,
           p_run_id: this.runId,
         });

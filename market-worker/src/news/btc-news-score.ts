@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   buildNewsDuplicateGroups,
   type DedupeNewsArticle,
@@ -231,7 +231,7 @@ export async function generateBtcNewsScore(
       windowHours * 60 * 60 * 1000,
   );
 
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("news_articles")
     .select(
       [
@@ -444,7 +444,7 @@ export async function generateBtcNewsScore(
   };
 
   const { error: insertError } =
-    await supabase
+    await database
       .from("news_scores")
       .insert({
         symbol: "BTCUSDT",

@@ -78,23 +78,28 @@
     "trend:snapshot:test": "tsx src/long-term-trend/LongTermTrendEngine.test.ts",
     "onchain:run": "tsx scripts/run-onchain.ts",
     "onchain:dry": "tsx scripts/run-onchain.ts --dry-run",
-    "onchain:test": "tsx src/onchain/OnchainAnalysis.test.ts"
+    "onchain:test": "tsx src/onchain/OnchainAnalysis.test.ts",
+    "buddy4:api": "tsx scripts/run-buddy4-api.ts",
+    "buddy4:test": "node --import tsx --test test/buddy4/*.test.ts",
+    "buddy4:schema:generate": "node scripts/generate-buddy4-schema.mjs",
+    "buddy4:migrate": "tsx scripts/migrate-buddy4.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.8",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "rss-parser": "^3.13.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "@marketmind/database": "file:../packages/database"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.23.1",
     "typescript": "6.0.3",
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "@electric-sql/pglite": "^0.5.3"
   }
 }

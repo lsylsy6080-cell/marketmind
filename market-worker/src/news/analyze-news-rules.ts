@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   analyzeNewsByRules,
   type RuleNewsInput,
@@ -17,7 +17,7 @@ interface PendingNewsArticle {
 async function markAnalyzing(
   articleId: number,
 ): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("news_articles")
     .update({
       analysis_status: "analyzing",
@@ -44,7 +44,7 @@ export async function analyzePendingBtcNewsByRules(
     engine: "btc-news-rules-v1",
   });
 
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("news_articles")
     .select(
       [
@@ -101,7 +101,7 @@ export async function analyzePendingBtcNewsByRules(
 
       const analysis = analyzeNewsByRules(input);
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await database
         .from("news_articles")
         .update({
           analysis_status: "completed",
@@ -146,7 +146,7 @@ export async function analyzePendingBtcNewsByRules(
         `[뉴스규칙] 기사 분석 실패: ${message}`,
       );
 
-      await supabase
+      await database
         .from("news_articles")
         .update({
           analysis_status: "failed",

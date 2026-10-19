@@ -1,9 +1,9 @@
 import "dotenv/config";
-import {supabase} from "../lib/supabase";
+import {database} from "../lib/database";
 import {buildEstimatedLiquidationMap} from "./EstimatedLiquidationMapEngine";
 
 export async function runEstimatedLiquidationMap(){
-  const {data:mapRow,error:mapError}=await supabase
+  const {data:mapRow,error:mapError}=await database
     .from("position_cluster_maps")
     .select("id,current_price,clusters,calculated_at")
     .eq("symbol","BTCUSDT")
@@ -35,7 +35,7 @@ export async function runEstimatedLiquidationMap(){
   });
 
   const bucket=new Date(Math.floor(Date.now()/60_000)*60_000).toISOString();
-  const {data:inserted,error:saveError}=await supabase
+  const {data:inserted,error:saveError}=await database
     .from("estimated_liquidation_maps")
     .upsert({
       symbol:"BTCUSDT",
@@ -59,10 +59,10 @@ export async function runEstimatedLiquidationMap(){
   if(saveError)throw new Error(`[Liquidation Map] map 저장 실패: ${saveError.message}`);
 
   if(inserted?.id){
-    await supabase.from("estimated_liquidation_levels").delete().eq("map_id",inserted.id);
+    await database.from("estimated_liquidation_levels").delete().eq("map_id",inserted.id);
     const levels=[...map.longZones,...map.shortZones];
     if(levels.length){
-      const {error:levelError}=await supabase.from("estimated_liquidation_levels").insert(
+      const {error:levelError}=await database.from("estimated_liquidation_levels").insert(
         levels.map(z=>({
           map_id:inserted.id,
           symbol:"BTCUSDT",
