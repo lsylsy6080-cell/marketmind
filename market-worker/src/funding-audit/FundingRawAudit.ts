@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 type PremiumIndex = { symbol:string; lastFundingRate:string; interestRate?:string; markPrice:string; indexPrice:string; nextFundingTime:number; time:number };
 const round=(v:number,d=8)=>{const m=10**d;return Math.round(v*m)/m};
@@ -9,7 +9,7 @@ export async function runFundingRawAudit(){
   const raw=await response.json() as PremiumIndex;
   const rawRate=Number(raw.lastFundingRate);
   if(!Number.isFinite(rawRate)) throw new Error(`[Funding Raw Audit] lastFundingRate invalid: ${raw.lastFundingRate}`);
-  const {data,error}=await supabase.from("funding_snapshots")
+  const {data,error}=await database.from("funding_snapshots")
     .select("id,fetched_at,funding_rate,funding_rate_percent,score,score_details,strategy_version")
     .eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(20);
   if(error) throw new Error(`[Funding Raw Audit] DB 조회 실패: ${error.message}`);

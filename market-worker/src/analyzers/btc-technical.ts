@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   type Candle,
   calculateAdx,
@@ -138,7 +138,7 @@ export async function analyzeBtcTechnical(): Promise<void> {
     console.log("[기술지표] 분석 함수 진입");
     console.log("[기술지표] 캔들 조회 직전");
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from("market_candles")
       .select("open_time,open,high,low,close,volume")
       .eq("exchange", "binance")
@@ -314,7 +314,7 @@ export async function analyzeBtcTechnical(): Promise<void> {
     });
 
     const { data: existing, error: existingError } =
-      await supabase
+      await database
         .from("technical_snapshots")
         .select("id")
         .eq("exchange", "binance")
@@ -340,7 +340,7 @@ export async function analyzeBtcTechnical(): Promise<void> {
         id: existing.id,
       });
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await database
         .from("technical_snapshots")
         .update(snapshot)
         .eq("id", existing.id);
@@ -360,7 +360,7 @@ export async function analyzeBtcTechnical(): Promise<void> {
 
     console.log("[기술지표] 새 스냅샷 저장 시작");
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await database
       .from("technical_snapshots")
       .insert(snapshot);
 

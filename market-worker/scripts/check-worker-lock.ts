@@ -1,8 +1,8 @@
 import "dotenv/config";
-import { supabase } from "../src/lib/supabase";
+import { database } from "../src/lib/database";
 
 const workerName = "market-worker-main";
-const { data, error } = await supabase
+const { data, error } = await database
   .from("worker_execution_locks")
   .select("worker_name,run_id,acquired_at,locked_until")
   .eq("worker_name", workerName)

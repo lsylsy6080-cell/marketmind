@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   analyzeStrategyPerformance,
   type ClosedTradeSample,
@@ -83,7 +83,7 @@ function mapTrade(row: TradeRow): ClosedTradeSample {
 }
 
 async function getActiveConfigs(): Promise<StrategyConfigRow[]> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("paper_strategy_configs")
     .select(`
       id,
@@ -111,7 +111,7 @@ async function getActiveConfigs(): Promise<StrategyConfigRow[]> {
 async function getClosedTrades(
   config: StrategyConfigRow,
 ): Promise<ClosedTradeSample[]> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("paper_trades")
     .select("id, net_pnl, return_percent, closed_at, side, entry_confidence, holding_seconds, close_reason, mfe_percent, mae_percent")
     .eq("account_id", config.account_id)
@@ -132,7 +132,7 @@ async function getClosedTrades(
 async function getLatestSnapshot(
   configId: number,
 ): Promise<LatestSnapshotRow | null> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("strategy_performance_snapshots")
     .select("total_trades, last_trade_id, average_holding_seconds, side_performance, confidence_performance, exit_reason_performance, excursion_metrics")
     .eq("strategy_config_id", configId)
@@ -244,7 +244,7 @@ async function analyzeOneConfig(config: StrategyConfigRow): Promise<{
     return { saved: false, metrics };
   }
 
-  const { error } = await supabase
+  const { error } = await database
     .from("strategy_performance_snapshots")
     .insert(buildSnapshot(config, metrics));
 

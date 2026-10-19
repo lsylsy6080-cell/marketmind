@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 type BinanceInterval = "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 
@@ -84,7 +84,7 @@ async function saveInterval(
     return 0;
   }
 
-  const { error } = await supabase
+  const { error } = await database
     .from("market_candles")
     .upsert(rows, {
       onConflict: "exchange,market_type,symbol,timeframe,open_time",

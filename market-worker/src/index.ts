@@ -18,7 +18,7 @@ import { runDecisionV2 } from "./decision-v2/run-decision-v2";
 import { runAdaptiveSizing } from "./position-sizing/run-adaptive-sizing";
 import { refreshSignalCalibrationIfStale } from "./calibration/refresh-signal-calibration";
 import { WorkerExecutionTracker } from "./operations/WorkerExecutionTracker";
-import { supabase } from "./lib/supabase";
+import { database } from "./lib/database";
 import { runLongTermTrendSnapshot } from "./long-term-trend/run-long-term-trend-snapshot";
 
 const rootLog = console.log.bind(console);
@@ -45,7 +45,7 @@ function roundSeconds(startedAt: number): string {
 }
 
 async function getLatestDecisionSummary(): Promise<string> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("final_market_decisions")
     .select("action,final_score,final_confidence")
     .eq("symbol", "BTCUSDT")
@@ -179,7 +179,7 @@ async function main(): Promise<void> {
 
     // Phase 7-4: V1/V2 성과 비교 snapshot. 평가 테이블 문제로 본 worker를 중단하지 않는다.
     try {
-      const { data: latestBattle } = await supabase
+      const { data: latestBattle } = await database
         .from("performance_battle_snapshots")
         .select("calculated_at")
         .eq("symbol", "BTCUSDT")

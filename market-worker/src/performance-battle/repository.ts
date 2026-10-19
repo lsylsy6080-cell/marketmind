@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type {
   BattleDecision,
   BattlePair,
@@ -27,7 +27,7 @@ export async function loadBattlePairs(): Promise<{
   candidateV2Snapshots: number;
   excludedLaggedPairs: number;
 }> {
-  const { data: v2Raw, error: v2Error } = await supabase
+  const { data: v2Raw, error: v2Error } = await database
     .from("ai_decision_v2_snapshots")
     .select(`
       id, calculated_at, v1_decision_id, regime_snapshot_id,
@@ -60,14 +60,14 @@ export async function loadBattlePairs(): Promise<{
 
   const [{ data: v1Raw, error: v1Error }, { data: backtestRaw, error: backtestError }] =
     await Promise.all([
-      supabase
+      database
         .from("final_market_decisions")
         .select(`
           id, decided_at, direction, action, trading_permission,
           final_score, final_confidence, strategy_version
         `)
         .in("id", v1Ids),
-      supabase
+      database
         .from("final_market_backtests")
         .select(`
           decision_id, return_1h, return_4h, return_24h
@@ -93,7 +93,7 @@ export async function loadBattlePairs(): Promise<{
 
   const regimeById = new Map<number, string>();
   if (regimeIds.length > 0) {
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from("market_regime_snapshots")
       .select("id,regime")
       .in("id", regimeIds);
@@ -192,7 +192,7 @@ export async function savePerformanceBattle(result: PerformanceBattleResult): Pr
     strategy_version: result.strategyVersion,
   };
 
-  const { error } = await supabase
+  const { error } = await database
     .from("performance_battle_snapshots")
     .insert(payload);
 

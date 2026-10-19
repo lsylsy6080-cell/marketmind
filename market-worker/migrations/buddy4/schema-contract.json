@@ -1,0 +1,3197 @@
+{
+  "sourceCommit": "b62ae5b5992315cf36ab9bc8ceee83294438d9e4",
+  "assumptions": [
+    "Original Supabase catalog unavailable; this is a replacement schema, not an exact catalog export.",
+    "Numeric financial values use arbitrary-precision numeric; JSON objects and arrays use jsonb.",
+    "New FK mappings follow caller identifiers; deletion is RESTRICT except ephemeral map child levels.",
+    "Trading RPC accounting is reconstructed and documented; production acceptance requires Buddy4 test DB runs.",
+    "Existing five schemas are retained from migrations 001-004; drift checks fail rather than silently repair."
+  ],
+  "tables": [
+    {
+      "name": "adaptive_battle_configs",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "minimum_trades": "numeric",
+        "fixed_initial_balance": "numeric",
+        "adaptive_initial_balance": "numeric",
+        "is_active": "boolean",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-battle/run-fixed-vs-adaptive-battle.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "is_active": "true",
+        "created_at": "now()",
+        "minimum_trades": "30"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_battle_snapshots",
+      "columns": {
+        "id": "bigint",
+        "battle_config_id": "bigint",
+        "symbol": "text",
+        "status": "text",
+        "winner": "text",
+        "fixed_metrics": "jsonb",
+        "adaptive_metrics": "jsonb",
+        "fixed_score": "jsonb",
+        "adaptive_score": "jsonb",
+        "reasons": "jsonb",
+        "analyzed_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-battle/run-fixed-vs-adaptive-battle.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "battle_config_id": "adaptive_battle_configs"
+      },
+      "defaults": {
+        "analyzed_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_paper_accounts",
+      "columns": {
+        "id": "bigint",
+        "base_account_id": "bigint",
+        "initial_balance": "numeric",
+        "cash_balance": "numeric",
+        "is_active": "boolean",
+        "reserved_margin": "numeric",
+        "realized_pnl": "numeric",
+        "total_fees": "numeric",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-paper/run-adaptive-paper-trading.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "base_account_id"
+        ]
+      ],
+      "foreignKeys": {
+        "base_account_id": "paper_trading_accounts"
+      },
+      "defaults": {
+        "is_active": "true",
+        "reserved_margin": "0",
+        "realized_pnl": "0",
+        "total_fees": "0",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "base_account_id",
+        "created_at",
+        "initial_balance",
+        "cash_balance"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_paper_equity_snapshots",
+      "columns": {
+        "id": "bigint",
+        "account_id": "bigint",
+        "symbol": "text",
+        "cash_balance": "numeric",
+        "reserved_margin": "numeric",
+        "unrealized_pnl": "numeric",
+        "equity": "numeric",
+        "market_price": "numeric",
+        "open_position_id": "bigint",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-paper/run-adaptive-paper-trading.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "adaptive_paper_accounts",
+        "open_position_id": "adaptive_paper_positions"
+      },
+      "defaults": {
+        "reserved_margin": "0",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_paper_positions",
+      "columns": {
+        "id": "bigint",
+        "stop_loss_price": "numeric",
+        "squeeze_warning_snapshot_id": "bigint",
+        "squeeze_phase": "text",
+        "squeeze_alert_score": "numeric",
+        "squeeze_protection_action": "text",
+        "squeeze_protective_stop_price": "numeric",
+        "squeeze_protection_updated_at": "timestamptz",
+        "requested_leverage": "numeric",
+        "estimated_liquidation_price": "numeric",
+        "liquidation_distance_percent": "numeric",
+        "liquidation_safety_buffer_percent": "numeric",
+        "liquidation_safety_status": "text",
+        "maintenance_margin_rate_percent": "numeric",
+        "leverage_adjusted": "boolean",
+        "liquidation_safety_reasons": "jsonb",
+        "status": "text",
+        "symbol": "text",
+        "account_id": "bigint",
+        "base_config_id": "bigint",
+        "side": "text",
+        "quantity": "numeric",
+        "entry_price": "numeric",
+        "take_profit_price": "numeric",
+        "margin_amount": "numeric",
+        "notional_amount": "numeric",
+        "opened_at": "timestamptz",
+        "margin_percent": "numeric",
+        "leverage": "numeric",
+        "entry_fee": "numeric",
+        "exit_fee": "numeric",
+        "exit_price": "numeric",
+        "realized_pnl": "numeric",
+        "realized_return_percent": "numeric",
+        "risk_reward_ratio": "numeric",
+        "expected_stop_loss_amount": "numeric",
+        "decision_v2_id": "bigint",
+        "sizing_snapshot_id": "bigint",
+        "closed_at": "timestamptz",
+        "close_reason": "text",
+        "created_at": "timestamptz",
+        "entry_account_equity": "numeric"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-paper/run-adaptive-paper-trading.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "adaptive_paper_accounts",
+        "base_config_id": "paper_strategy_configs",
+        "decision_v2_id": "ai_decision_v2_snapshots",
+        "sizing_snapshot_id": "adaptive_position_sizing_snapshots",
+        "squeeze_warning_snapshot_id": "squeeze_early_warning_snapshots"
+      },
+      "defaults": {
+        "leverage_adjusted": "false",
+        "opened_at": "now()",
+        "entry_fee": "0",
+        "exit_fee": "0",
+        "realized_pnl": "0",
+        "created_at": "now()",
+        "status": "'open'"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_paper_trades",
+      "columns": {
+        "id": "bigint",
+        "requested_leverage": "numeric",
+        "estimated_liquidation_price": "numeric",
+        "liquidation_distance_percent": "numeric",
+        "liquidation_safety_buffer_percent": "numeric",
+        "liquidation_safety_status": "text",
+        "maintenance_margin_rate_percent": "numeric",
+        "leverage_adjusted": "boolean",
+        "squeeze_warning_snapshot_id": "bigint",
+        "squeeze_exit_phase": "text",
+        "squeeze_exit_alert_score": "numeric",
+        "squeeze_protection_action": "text",
+        "squeeze_strategy_version": "text",
+        "closed_at": "timestamptz",
+        "symbol": "text",
+        "account_id": "bigint",
+        "net_pnl": "numeric",
+        "return_on_equity_percent": "numeric",
+        "entry_fee": "numeric",
+        "exit_fee": "numeric",
+        "opened_at": "timestamptz",
+        "leverage": "numeric",
+        "gross_pnl": "numeric",
+        "return_percent": "numeric",
+        "return_on_margin_percent": "numeric",
+        "margin_amount": "numeric",
+        "notional_amount": "numeric",
+        "quantity": "numeric",
+        "entry_price": "numeric",
+        "exit_price": "numeric",
+        "position_id": "bigint",
+        "base_config_id": "bigint",
+        "decision_v2_id": "bigint",
+        "sizing_snapshot_id": "bigint",
+        "side": "text",
+        "close_reason": "text",
+        "created_at": "timestamptz",
+        "entry_account_equity": "numeric"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-paper/run-adaptive-paper-trading.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "position_id"
+        ]
+      ],
+      "foreignKeys": {
+        "account_id": "adaptive_paper_accounts",
+        "position_id": "adaptive_paper_positions",
+        "base_config_id": "paper_strategy_configs",
+        "decision_v2_id": "ai_decision_v2_snapshots",
+        "sizing_snapshot_id": "adaptive_position_sizing_snapshots",
+        "squeeze_warning_snapshot_id": "squeeze_early_warning_snapshots"
+      },
+      "defaults": {
+        "leverage_adjusted": "false",
+        "entry_fee": "0",
+        "exit_fee": "0",
+        "opened_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_position_sizing_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "decision_v2_id": "bigint",
+        "trigger_status": "text",
+        "sizing_status": "text",
+        "risk_tier": "text",
+        "sizing_score": "numeric",
+        "margin_percent": "numeric",
+        "leverage": "numeric",
+        "effective_exposure_multiple": "numeric",
+        "effective_exposure_percent": "numeric",
+        "margin_amount": "numeric",
+        "notional_amount": "numeric",
+        "max_account_risk_percent": "numeric",
+        "estimated_stop_loss_risk_percent": "numeric",
+        "estimated_stop_loss_amount": "numeric",
+        "stop_loss_distance_percent": "numeric",
+        "caps_applied": "jsonb",
+        "blockers": "jsonb",
+        "reasons": "jsonb",
+        "apply_mode": "text",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/position-sizing/run-adaptive-sizing.ts",
+        "market-worker/src/adaptive-paper/run-adaptive-paper-trading.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "decision_v2_id",
+          "strategy_version"
+        ]
+      ],
+      "foreignKeys": {
+        "decision_v2_id": "ai_decision_v2_snapshots"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "decision_v2_id",
+        "strategy_version",
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "adaptive_weight_advisor_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "regime": "text",
+        "baseline_weights": "jsonb",
+        "candidate_weights": "jsonb",
+        "recommended_weights": "jsonb",
+        "evidence": "jsonb",
+        "sample_count": "numeric",
+        "status": "text",
+        "status_reason": "text",
+        "validation_summary": "jsonb",
+        "max_adjustment": "numeric",
+        "methodology": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/adaptive-weight/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "ai_decision_v2_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "technical_score_id": "bigint",
+        "news_score_id": "bigint",
+        "funding_score_id": "bigint",
+        "regime_snapshot_id": "bigint",
+        "v1_decision_id": "bigint",
+        "direction_score": "numeric",
+        "market_trend_strength": "numeric",
+        "direction_strength": "numeric",
+        "final_score": "numeric",
+        "final_confidence": "numeric",
+        "direction": "text",
+        "action": "text",
+        "entry_quality_score": "numeric",
+        "entry_quality": "text",
+        "overheat_risk": "numeric",
+        "reversal_risk": "numeric",
+        "data_reliability": "numeric",
+        "risk_level": "text",
+        "trading_permission": "text",
+        "preferred_entry": "text",
+        "entry_plan": "jsonb",
+        "entry_trigger": "jsonb",
+        "funding_crowding_risk": "numeric",
+        "funding_crowding_side": "text",
+        "funding_entry_penalty": "numeric",
+        "funding_crowding_status": "text",
+        "open_interest_snapshot_id": "bigint",
+        "open_interest_flow_state": "text",
+        "open_interest_directional_bias": "text",
+        "open_interest_confidence": "numeric",
+        "open_interest_entry_adjustment": "numeric",
+        "open_interest_overheat_adjustment": "numeric",
+        "open_interest_reversal_adjustment": "numeric",
+        "liquidation_snapshot_id": "bigint",
+        "liquidation_state": "text",
+        "liquidation_directional_bias": "text",
+        "liquidation_confidence": "numeric",
+        "liquidation_entry_adjustment": "numeric",
+        "liquidation_overheat_adjustment": "numeric",
+        "liquidation_reversal_adjustment": "numeric",
+        "squeeze_warning_snapshot_id": "bigint",
+        "squeeze_warning_status": "text",
+        "squeeze_long_phase": "text",
+        "squeeze_short_phase": "text",
+        "squeeze_dominant_warning": "text",
+        "squeeze_entry_penalty": "numeric",
+        "squeeze_overheat_adjustment": "numeric",
+        "squeeze_reversal_adjustment": "numeric",
+        "squeeze_permission_override": "text",
+        "squeeze_recommended_response": "text",
+        "weights": "jsonb",
+        "component_contributions": "jsonb",
+        "decision_reasons": "jsonb",
+        "invalidation_conditions": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/decision-v2/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "technical_score_id",
+          "news_score_id",
+          "funding_score_id",
+          "regime_snapshot_id",
+          "strategy_version"
+        ]
+      ],
+      "foreignKeys": {
+        "technical_score_id": "market_scores",
+        "news_score_id": "news_scores",
+        "funding_score_id": "funding_snapshots",
+        "regime_snapshot_id": "market_regime_snapshots",
+        "v1_decision_id": "final_market_decisions",
+        "open_interest_snapshot_id": "btc_open_interest_snapshots",
+        "liquidation_snapshot_id": "btc_liquidation_snapshots",
+        "squeeze_warning_snapshot_id": "squeeze_early_warning_snapshots"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "technical_score_id",
+        "news_score_id",
+        "funding_score_id",
+        "regime_snapshot_id",
+        "strategy_version",
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "btc_liquidation_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "started_at": "timestamptz",
+        "ended_at": "timestamptz",
+        "event_count": "numeric",
+        "long_liquidation_usd": "numeric",
+        "short_liquidation_usd": "numeric",
+        "total_liquidation_usd": "numeric",
+        "dominance_ratio": "numeric",
+        "dominant_side": "text",
+        "first_price": "numeric",
+        "last_price": "numeric",
+        "price_change_percent": "numeric",
+        "burst_multiple": "numeric",
+        "state": "text",
+        "directional_bias": "text",
+        "confidence": "numeric",
+        "entry_adjustment": "numeric",
+        "overheat_adjustment": "numeric",
+        "reversal_adjustment": "numeric",
+        "reasons": "jsonb",
+        "stream_healthy": "boolean",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/liquidation/LiquidationStreamCollector.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "started_at": "now()",
+        "stream_healthy": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "btc_open_interest_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "fetched_at": "timestamptz",
+        "price": "numeric",
+        "open_interest": "numeric",
+        "open_interest_value": "numeric",
+        "oi_change_5m_percent": "numeric",
+        "oi_change_15m_percent": "numeric",
+        "oi_change_1h_percent": "numeric",
+        "price_change_5m_percent": "numeric",
+        "price_change_15m_percent": "numeric",
+        "price_change_1h_percent": "numeric",
+        "flow_state": "text",
+        "directional_bias": "text",
+        "confidence": "numeric",
+        "entry_adjustment": "numeric",
+        "overheat_adjustment": "numeric",
+        "reversal_adjustment": "numeric",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/open-interest/collect-open-interest.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "fetched_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_activation_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "mode": "text",
+        "base_action": "text",
+        "effective_action": "text",
+        "effective_trading_permission": "text",
+        "effective_entry_quality_score": "numeric",
+        "applied": "boolean",
+        "blocked_by_context": "boolean",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-activation/run-phase8-context-activation.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "applied": "false",
+        "blocked_by_context": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_decision_gate_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "base_direction": "text",
+        "base_action": "text",
+        "base_trading_permission": "text",
+        "context_direction": "text",
+        "context_permission": "text",
+        "alignment": "text",
+        "gate_permission": "text",
+        "shadow_action": "text",
+        "entry_score_delta": "numeric",
+        "shadow_entry_quality_score": "numeric",
+        "confidence": "numeric",
+        "reasons": "jsonb",
+        "source_calculated_at": "jsonb",
+        "performance": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-decision-gate/run-phase8-context-decision-gate.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_execution_guard_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "side": "text",
+        "permission": "text",
+        "margin_multiplier": "numeric",
+        "side_allowed": "boolean",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-execution-guard/run-phase8-context-execution-guard.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "side_allowed": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_execution_outcome_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "guard_snapshot_id": "bigint",
+        "guard_calculated_at": "timestamptz",
+        "side": "text",
+        "permission": "text",
+        "margin_multiplier": "numeric",
+        "reference_price": "numeric",
+        "future_price": "numeric",
+        "directional_return_percent": "numeric",
+        "outcome_label": "text",
+        "quality_score": "numeric",
+        "horizon_minutes": "numeric",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-outcome/run-phase8-context-outcome.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "guard_snapshot_id"
+        ]
+      ],
+      "foreignKeys": {
+        "guard_snapshot_id": "context_execution_guard_snapshots"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "guard_snapshot_id",
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_performance_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "sample_count": "numeric",
+        "decisive_sample_count": "numeric",
+        "positive_count": "numeric",
+        "negative_count": "numeric",
+        "neutral_count": "numeric",
+        "success_rate": "numeric",
+        "average_quality_score": "numeric",
+        "average_directional_return_percent": "numeric",
+        "avoided_loss_count": "numeric",
+        "missed_opportunity_count": "numeric",
+        "status": "text",
+        "auto_tuning_allowed": "boolean",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-performance/run-phase8-context-performance.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "auto_tuning_allowed": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_promotion_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "status": "text",
+        "eligible": "boolean",
+        "minimum_sample_count": "numeric",
+        "minimum_decisive_sample_count": "numeric",
+        "minimum_success_rate": "numeric",
+        "minimum_average_quality_score": "numeric",
+        "missed_opportunity_ratio": "numeric",
+        "reasons": "jsonb",
+        "auto_apply_allowed": "boolean",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-promotion/run-phase8-safety-promotion.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "eligible": "false",
+        "auto_apply_allowed": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_rollback_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "tuning_candidate_id": "bigint",
+        "status": "text",
+        "rollback_recommended": "boolean",
+        "success_rate_drop": "numeric",
+        "quality_score_drop": "numeric",
+        "minimum_post_apply_samples": "numeric",
+        "reasons": "jsonb",
+        "auto_rollback_allowed": "boolean",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-rollback/run-phase8-auto-rollback-protection.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "tuning_candidate_id": "context_tuning_candidates"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "rollback_recommended": "false",
+        "auto_rollback_allowed": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "context_tuning_candidates",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "status": "text",
+        "candidate": "jsonb",
+        "deltas": "jsonb",
+        "auto_apply_allowed": "boolean",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-tuning/run-phase8-adaptive-context-tuning.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "auto_apply_allowed": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "estimated_liquidation_levels",
+      "columns": {
+        "id": "bigint",
+        "map_id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "side": "text",
+        "price_low": "numeric",
+        "price_high": "numeric",
+        "center_price": "numeric",
+        "distance_from_current_percent": "numeric",
+        "intensity": "numeric",
+        "confidence": "numeric",
+        "estimated_risk_usd": "numeric",
+        "source_cluster_count": "numeric",
+        "contributing_cluster_centers": "jsonb",
+        "leverage_mix": "jsonb",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/liquidation-map/run-estimated-liquidation-map.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "map_id": "estimated_liquidation_maps"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "map_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "estimated_liquidation_maps",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "current_price": "numeric",
+        "source_position_cluster_map_id": "bigint",
+        "maintenance_margin_rate": "numeric",
+        "leverage_distribution": "jsonb",
+        "nearest_long_zone": "jsonb",
+        "nearest_short_zone": "jsonb",
+        "strongest_long_zone": "jsonb",
+        "strongest_short_zone": "jsonb",
+        "long_zones": "jsonb",
+        "short_zones": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/liquidation-map/run-estimated-liquidation-map.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {
+        "source_position_cluster_map_id": "position_cluster_maps"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "etf_flow_details",
+      "columns": {
+        "id": "bigint",
+        "snapshot_id": "bigint",
+        "ticker": "text",
+        "flow_usd": "numeric",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/etf/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "snapshot_id",
+          "ticker"
+        ]
+      ],
+      "foreignKeys": {
+        "snapshot_id": "etf_flow_snapshots"
+      },
+      "defaults": {
+        "created_at": "now()"
+      },
+      "notNull": [
+        "snapshot_id",
+        "ticker",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "etf_flow_price_responses",
+      "columns": {
+        "id": "bigint",
+        "asset": "text",
+        "market": "text",
+        "flow_date": "date",
+        "source": "text",
+        "observed_at": "timestamptz",
+        "flow_usd": "numeric",
+        "flow_direction": "text",
+        "flow_strength": "text",
+        "anchor_price_usd": "numeric",
+        "return_6h_pct": "numeric",
+        "return_12h_pct": "numeric",
+        "return_24h_pct": "numeric",
+        "return_48h_pct": "numeric",
+        "state": "text",
+        "score": "numeric",
+        "confidence": "numeric",
+        "bullish_evidence": "numeric",
+        "bearish_evidence": "numeric",
+        "summary": "text",
+        "strategy_version": "text",
+        "calculated_at": "timestamptz",
+        "raw_data": "jsonb",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/etf-price-response/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "asset",
+          "market",
+          "flow_date",
+          "source",
+          "strategy_version"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "asset",
+        "market",
+        "flow_date",
+        "source",
+        "strategy_version",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "etf_flow_snapshots",
+      "columns": {
+        "id": "bigint",
+        "asset": "text",
+        "market": "text",
+        "flow_date": "date",
+        "total_flow_usd": "numeric",
+        "price_usd": "numeric",
+        "source": "text",
+        "source_timestamp": "timestamptz",
+        "fetched_at": "timestamptz",
+        "raw_data": "jsonb",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/etf/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "asset",
+          "market",
+          "flow_date",
+          "source"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "fetched_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "asset",
+        "market",
+        "flow_date",
+        "source",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "etf_scores",
+      "columns": {
+        "id": "bigint",
+        "asset": "text",
+        "flow_date": "date",
+        "daily_flow_usd": "numeric",
+        "flow_3d_usd": "numeric",
+        "flow_5d_usd": "numeric",
+        "flow_20d_usd": "numeric",
+        "positive_streak": "numeric",
+        "negative_streak": "numeric",
+        "score": "numeric",
+        "confidence": "numeric",
+        "direction": "text",
+        "summary": "text",
+        "score_details": "jsonb",
+        "calculated_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/etf/score.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "asset",
+          "flow_date"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "asset",
+        "flow_date",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "final_market_backtests",
+      "columns": {
+        "id": "bigint",
+        "decision_id": "bigint",
+        "symbol": "text",
+        "entry_time": "timestamptz",
+        "entry_price": "numeric",
+        "status": "text",
+        "last_error": "text",
+        "retry_count": "numeric",
+        "price_5m": "numeric",
+        "price_15m": "numeric",
+        "price_30m": "numeric",
+        "price_1h": "numeric",
+        "price_4h": "numeric",
+        "price_24h": "numeric",
+        "return_5m": "numeric",
+        "return_15m": "numeric",
+        "return_30m": "numeric",
+        "return_1h": "numeric",
+        "return_4h": "numeric",
+        "return_24h": "numeric",
+        "best_return": "numeric",
+        "worst_return": "numeric",
+        "observed_at_5m": "timestamptz",
+        "observed_at_15m": "timestamptz",
+        "observed_at_30m": "timestamptz",
+        "observed_at_1h": "timestamptz",
+        "observed_at_4h": "timestamptz",
+        "observed_at_24h": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/backtest/run-final-market-backtests.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "decision_id"
+        ]
+      ],
+      "foreignKeys": {
+        "decision_id": "final_market_decisions"
+      },
+      "defaults": {
+        "retry_count": "0",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "decision_id",
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "final_market_decisions",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "decided_at": "timestamptz",
+        "technical_score_id": "bigint",
+        "news_score_id": "bigint",
+        "funding_score_id": "bigint",
+        "technical_score": "numeric",
+        "technical_confidence": "numeric",
+        "news_score": "numeric",
+        "news_confidence": "numeric",
+        "funding_score": "numeric",
+        "funding_confidence": "numeric",
+        "technical_weight": "numeric",
+        "news_weight": "numeric",
+        "funding_weight": "numeric",
+        "final_score": "numeric",
+        "final_confidence": "numeric",
+        "direction": "text",
+        "action": "text",
+        "market_regime": "text",
+        "risk_level": "text",
+        "trading_permission": "text",
+        "signal_alignment": "text",
+        "conflict_score": "numeric",
+        "decision_summary": "text",
+        "decision_reasons": "jsonb",
+        "score_details": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/final/generate-final-market-decision.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "technical_score_id": "market_scores",
+        "news_score_id": "news_scores",
+        "funding_score_id": "funding_snapshots"
+      },
+      "defaults": {
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "final_market_performance",
+      "columns": {
+        "id": "bigint",
+        "decision_id": "bigint",
+        "backtest_id": "bigint",
+        "symbol": "text",
+        "strategy_version": "text",
+        "direction": "text",
+        "action": "text",
+        "trading_permission": "text",
+        "risk_level": "text",
+        "final_score": "numeric",
+        "final_confidence": "numeric",
+        "evaluation_horizon": "text",
+        "market_return": "numeric",
+        "directional_return": "numeric",
+        "threshold_percent": "numeric",
+        "direction_result": "text",
+        "action_result": "text",
+        "evaluation_status": "text",
+        "evaluation_reason": "text",
+        "evaluated_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/performance/run-performance-engine.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "backtest_id"
+        ]
+      ],
+      "foreignKeys": {
+        "decision_id": "final_market_decisions",
+        "backtest_id": "final_market_backtests"
+      },
+      "defaults": {
+        "created_at": "now()"
+      },
+      "notNull": [
+        "backtest_id",
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "funding_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "fetched_at": "timestamptz",
+        "funding_time": "timestamptz",
+        "next_funding_time": "timestamptz",
+        "funding_rate": "numeric",
+        "funding_rate_percent": "numeric",
+        "annualized_rate_percent": "numeric",
+        "mark_price": "numeric",
+        "index_price": "numeric",
+        "score": "numeric",
+        "confidence": "numeric",
+        "direction": "text",
+        "risk_level": "text",
+        "trading_permission": "text",
+        "score_details": "jsonb",
+        "strategy_version": "text"
+      },
+      "evidence": [
+        "market-worker/src/funding/generate-btc-funding-snapshot.ts"
+      ],
+      "origin": "existing-branch-ddl",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "score_details": "'{}'::jsonb"
+      },
+      "notNull": [
+        "id",
+        "symbol",
+        "fetched_at",
+        "funding_rate",
+        "funding_rate_percent",
+        "annualized_rate_percent",
+        "mark_price",
+        "index_price",
+        "score",
+        "confidence",
+        "direction",
+        "risk_level",
+        "trading_permission",
+        "score_details",
+        "strategy_version"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "global_futures_exchange_snapshots",
+      "columns": {
+        "id": "bigint",
+        "bucket_time": "timestamptz",
+        "fetched_at": "timestamptz",
+        "exchange": "text",
+        "symbol": "text",
+        "last_price": "numeric",
+        "mark_price": "numeric",
+        "volume_24h_base": "numeric",
+        "turnover_24h_usd": "numeric",
+        "open_interest_base": "numeric",
+        "open_interest_usd": "numeric",
+        "funding_rate": "numeric",
+        "taker_buy_usd": "numeric",
+        "taker_sell_usd": "numeric",
+        "taker_buy_ratio": "numeric",
+        "available": "boolean",
+        "error": "text",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/global-futures/GlobalFuturesCollector.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "exchange",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "fetched_at": "now()",
+        "available": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "exchange",
+        "bucket_time",
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "global_futures_snapshots",
+      "columns": {
+        "id": "bigint",
+        "bucket_time": "timestamptz",
+        "fetched_at": "timestamptz",
+        "symbol": "text",
+        "exchange_count": "numeric",
+        "healthy_exchange_count": "numeric",
+        "total_turnover_24h_usd": "numeric",
+        "total_open_interest_usd": "numeric",
+        "weighted_funding_rate": "numeric",
+        "global_taker_buy_ratio": "numeric",
+        "global_taker_sell_ratio": "numeric",
+        "taker_source_count": "numeric",
+        "taker_source_coverage_percent": "numeric",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/global-futures/GlobalFuturesCollector.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "fetched_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "long_term_trend_snapshots",
+      "columns": {
+        "id": "bigint",
+        "exchange": "text",
+        "market_type": "text",
+        "symbol": "text",
+        "engine_version": "text",
+        "snapshot_hour": "timestamptz",
+        "market_price": "numeric",
+        "weekly_score": "numeric",
+        "daily_score": "numeric",
+        "four_hour_score": "numeric",
+        "combined_score": "numeric",
+        "combined_label": "text",
+        "combined_confidence": "numeric",
+        "combined_risk": "numeric",
+        "trend_continuation": "numeric",
+        "reversal_risk": "numeric",
+        "weekly_label": "text",
+        "daily_label": "text",
+        "four_hour_label": "text",
+        "weekly_structure": "text",
+        "daily_structure": "text",
+        "four_hour_structure": "text",
+        "weekly_data_quality": "numeric",
+        "daily_data_quality": "numeric",
+        "four_hour_data_quality": "numeric",
+        "reference_timeframe": "text",
+        "reference_support": "numeric",
+        "reference_resistance": "numeric",
+        "long_term_support": "numeric",
+        "long_term_resistance": "numeric",
+        "current_support": "numeric",
+        "current_resistance": "numeric",
+        "current_support_source": "text",
+        "current_resistance_source": "text",
+        "current_support_distance_pct": "numeric",
+        "current_resistance_distance_pct": "numeric",
+        "current_range_width_pct": "numeric",
+        "neutral_range_eligible": "boolean",
+        "scenario_activation_reason": "jsonb",
+        "bullish_scenario_strength": "numeric",
+        "neutral_scenario_strength": "numeric",
+        "bearish_scenario_strength": "numeric",
+        "bullish_scenario_state": "text",
+        "neutral_scenario_state": "text",
+        "bearish_scenario_state": "text",
+        "weekly_structure_event": "jsonb",
+        "daily_structure_event": "jsonb",
+        "four_hour_structure_event": "jsonb",
+        "scenario_summary": "jsonb",
+        "snapshot_payload": "jsonb",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/long-term-trend/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "exchange",
+          "market_type",
+          "symbol",
+          "engine_version",
+          "snapshot_hour"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "neutral_range_eligible": "false",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "exchange",
+        "market_type",
+        "symbol",
+        "engine_version",
+        "snapshot_hour",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "market_candles",
+      "columns": {
+        "exchange": "text",
+        "market_type": "text",
+        "symbol": "text",
+        "timeframe": "text",
+        "open_time": "timestamptz",
+        "close_time": "timestamptz",
+        "open": "numeric",
+        "high": "numeric",
+        "low": "numeric",
+        "close": "numeric",
+        "volume": "numeric",
+        "quote_volume": "numeric",
+        "trade_count": "bigint",
+        "taker_buy_base_volume": "numeric",
+        "taker_buy_quote_volume": "numeric",
+        "is_closed": "boolean"
+      },
+      "evidence": [
+        "market-worker/src/collectors/binance-btc.ts",
+        "market-worker/src/collectors/binance-multi-timeframe.ts",
+        "market-worker/src/collectors/binance-futures-timeframe.ts"
+      ],
+      "origin": "existing-branch-ddl",
+      "unique": [
+        [
+          "exchange",
+          "market_type",
+          "symbol",
+          "timeframe",
+          "open_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {},
+      "notNull": [
+        "exchange",
+        "market_type",
+        "symbol",
+        "timeframe",
+        "open_time",
+        "close_time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "quote_volume",
+        "trade_count",
+        "taker_buy_base_volume",
+        "taker_buy_quote_volume",
+        "is_closed"
+      ],
+      "primaryKey": []
+    },
+    {
+      "name": "market_context_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "preferred_direction": "text",
+        "permission": "text",
+        "confidence": "numeric",
+        "context_score": "numeric",
+        "risk_score": "numeric",
+        "structure_state": "text",
+        "upside_room_percent": "numeric",
+        "downside_room_percent": "numeric",
+        "support_strength": "numeric",
+        "resistance_strength": "numeric",
+        "correlation_state": "text",
+        "correlation_risk_level": "text",
+        "reasons": "jsonb",
+        "source_calculated_at": "jsonb",
+        "performance": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-context/run-phase8-market-context.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "market_correlation_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "overall_correlation": "numeric",
+        "overall_divergence_score": "numeric",
+        "state": "text",
+        "risk_level": "text",
+        "timeframe_details": "jsonb",
+        "reasons": "jsonb",
+        "performance": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-correlation/run-phase8-correlation.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "market_intelligence_scores",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "market_score": "numeric",
+        "confidence": "numeric",
+        "direction": "text",
+        "signal": "text",
+        "risk_level": "text",
+        "conflict_level": "text",
+        "consensus_strength": "numeric",
+        "raw_score": "numeric",
+        "consensus_adjustment": "numeric",
+        "direction_votes": "jsonb",
+        "breakdown": "jsonb",
+        "summary": "text",
+        "reasons": "jsonb",
+        "funding_score": "numeric",
+        "etf_score": "numeric",
+        "news_score": "numeric",
+        "funding_weight": "numeric",
+        "etf_weight": "numeric",
+        "news_weight": "numeric",
+        "component_count": "numeric",
+        "score_details": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/intelligence/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "market_regime_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "regime": "text",
+        "direction_bias": "text",
+        "confidence": "numeric",
+        "trend_score": "numeric",
+        "alignment_score": "numeric",
+        "weighted_adx": "numeric",
+        "high_volatility_weight": "numeric",
+        "risk_level": "text",
+        "timeframe_details": "jsonb",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/regime/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time",
+          "strategy_version"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "strategy_version",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "market_scores",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "analyzed_at": "timestamptz",
+        "market_regime": "text",
+        "direction": "text",
+        "total_score": "numeric",
+        "confidence": "numeric",
+        "trend_score": "numeric",
+        "momentum_score": "numeric",
+        "volume_score": "numeric",
+        "structure_score": "numeric",
+        "volatility_score": "numeric",
+        "derivatives_score": "numeric",
+        "trading_permission": "text",
+        "risk_level": "text",
+        "strategy_version": "text",
+        "score_details": "jsonb"
+      },
+      "evidence": [
+        "market-worker/src/analyzers/btc-market-score.ts"
+      ],
+      "origin": "existing-branch-ddl",
+      "unique": [
+        [
+          "symbol",
+          "strategy_version",
+          "analyzed_at"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "score_details": "'{}'::jsonb"
+      },
+      "notNull": [
+        "id",
+        "symbol",
+        "analyzed_at",
+        "strategy_version",
+        "score_details"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "market_structure_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "current_price": "numeric",
+        "profiles": "jsonb",
+        "nearest_support": "jsonb",
+        "next_support": "jsonb",
+        "nearest_resistance": "jsonb",
+        "next_resistance": "jsonb",
+        "support_levels": "jsonb",
+        "resistance_levels": "jsonb",
+        "performance": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase8-market-structure/run-phase8-market-structure.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "news_articles",
+      "columns": {
+        "id": "bigint",
+        "analysis_status": "text",
+        "sentiment": "text",
+        "importance": "numeric",
+        "ai_score": "numeric",
+        "ai_summary": "text",
+        "ai_reason": "text",
+        "analyzed_at": "timestamptz",
+        "raw_data": "jsonb",
+        "source": "text",
+        "source_feed_url": "text",
+        "external_id": "text",
+        "title": "text",
+        "summary": "text",
+        "article_url": "text",
+        "asset": "text",
+        "language": "text",
+        "published_at": "timestamptz",
+        "relevance_score": "numeric",
+        "event_fingerprint": "text",
+        "translation_status": "text",
+        "localized_title": "text",
+        "localized_summary": "text",
+        "translated_at": "timestamptz",
+        "impact_level": "text",
+        "is_duplicate": "boolean",
+        "canonical_article_id": "bigint",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/news/analyze-news-rules.ts",
+        "market-worker/src/news/collect-news.ts",
+        "market-worker/src/news/korean-news-editor.ts",
+        "market-worker/src/news/news-dedupe-worker.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "article_url"
+        ]
+      ],
+      "foreignKeys": {
+        "canonical_article_id": "news_articles"
+      },
+      "defaults": {
+        "analyzed_at": "now()",
+        "is_duplicate": "false",
+        "created_at": "now()",
+        "analysis_status": "'pending'",
+        "translation_status": "'pending'"
+      },
+      "notNull": [
+        "article_url",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "news_scores",
+      "columns": {
+        "id": "bigint",
+        "event_categories": "jsonb",
+        "dominant_category": "text",
+        "market_pressure": "text",
+        "conflict_score": "numeric",
+        "event_summary": "jsonb",
+        "strategy_version": "text",
+        "score_details": "jsonb",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "window_hours": "numeric",
+        "article_count": "numeric",
+        "unique_article_count": "numeric",
+        "bullish_count": "numeric",
+        "neutral_count": "numeric",
+        "bearish_count": "numeric",
+        "raw_average_score": "numeric",
+        "weighted_score": "numeric",
+        "confidence": "numeric",
+        "direction": "text",
+        "risk_level": "text",
+        "top_positive": "jsonb",
+        "top_negative": "jsonb",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/news/btc-news-intelligence-v2.ts",
+        "market-worker/src/news/btc-news-score.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "onchain_snapshots",
+      "columns": {
+        "id": "bigint",
+        "asset": "text",
+        "snapshot_hour": "timestamptz",
+        "calculated_at": "timestamptz",
+        "onchain_score": "numeric",
+        "onchain_confidence": "numeric",
+        "direction": "text",
+        "metrics": "jsonb",
+        "signals": "jsonb",
+        "sources": "jsonb",
+        "raw_data": "jsonb",
+        "strategy_version": "text"
+      },
+      "evidence": [
+        "market-worker/src/onchain/run-onchain.ts"
+      ],
+      "origin": "existing-branch-ddl",
+      "unique": [
+        [
+          "asset",
+          "snapshot_hour"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "asset": "'BTC'",
+        "calculated_at": "now()",
+        "metrics": "'{}'::jsonb",
+        "signals": "'[]'::jsonb",
+        "sources": "'{}'::jsonb",
+        "raw_data": "'{}'::jsonb"
+      },
+      "notNull": [
+        "id",
+        "asset",
+        "snapshot_hour",
+        "calculated_at",
+        "onchain_confidence",
+        "direction",
+        "metrics",
+        "signals",
+        "sources",
+        "raw_data",
+        "strategy_version"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "always"
+    },
+    {
+      "name": "paper_equity_snapshots",
+      "columns": {
+        "id": "bigint",
+        "account_id": "bigint",
+        "symbol": "text",
+        "cash_balance": "numeric",
+        "unrealized_pnl": "numeric",
+        "equity": "numeric",
+        "open_position_id": "bigint",
+        "market_price": "numeric",
+        "captured_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/paper/run-paper-trading-worker.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "paper_trading_accounts",
+        "open_position_id": "paper_positions"
+      },
+      "defaults": {
+        "captured_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "paper_positions",
+      "columns": {
+        "id": "bigint",
+        "mfe_percent": "numeric",
+        "mae_percent": "numeric",
+        "entry_final_score": "numeric",
+        "entry_confidence": "numeric",
+        "entry_direction": "text",
+        "entry_action": "text",
+        "entry_trading_permission": "text",
+        "decision_snapshot": "jsonb",
+        "account_id": "bigint",
+        "opening_decision_id": "bigint",
+        "symbol": "text",
+        "side": "text",
+        "status": "text",
+        "quantity": "numeric",
+        "entry_price": "numeric",
+        "exit_price": "numeric",
+        "stop_loss_price": "numeric",
+        "take_profit_price": "numeric",
+        "entry_fee": "numeric",
+        "exit_fee": "numeric",
+        "realized_pnl": "numeric",
+        "realized_return_percent": "numeric",
+        "close_reason": "text",
+        "opened_at": "timestamptz",
+        "closed_at": "timestamptz",
+        "strategy_config_id": "bigint",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/paper/run-paper-trading-worker.ts",
+        "marketmind-ai/dashboard/types.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "paper_trading_accounts",
+        "strategy_config_id": "paper_strategy_configs",
+        "opening_decision_id": "final_market_decisions"
+      },
+      "defaults": {
+        "mfe_percent": "0",
+        "mae_percent": "0",
+        "entry_fee": "0",
+        "exit_fee": "0",
+        "realized_pnl": "0",
+        "opened_at": "now()",
+        "created_at": "now()",
+        "status": "'open'"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "paper_strategy_configs",
+      "columns": {
+        "id": "bigint",
+        "account_id": "bigint",
+        "symbol": "text",
+        "strategy_version": "text",
+        "long_score_min": "numeric",
+        "short_score_max": "numeric",
+        "confidence_min": "numeric",
+        "position_size_percent": "numeric",
+        "stop_loss_percent": "numeric",
+        "take_profit_percent": "numeric",
+        "max_holding_minutes": "numeric",
+        "fee_rate_percent": "numeric",
+        "slippage_percent": "numeric",
+        "allow_long": "boolean",
+        "allow_short": "boolean",
+        "is_active": "boolean",
+        "strategy_name": "text",
+        "strategy_kind": "text",
+        "description": "text",
+        "sort_order": "bigint",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "marketmind-ai/dashboard/types.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "paper_trading_accounts"
+      },
+      "defaults": {
+        "allow_long": "false",
+        "allow_short": "false",
+        "is_active": "true",
+        "sort_order": "0",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id",
+        "long_score_min",
+        "short_score_max",
+        "confidence_min",
+        "position_size_percent",
+        "stop_loss_percent",
+        "take_profit_percent",
+        "max_holding_minutes",
+        "fee_rate_percent",
+        "slippage_percent"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "paper_strategy_runs",
+      "columns": {
+        "id": "bigint",
+        "account_id": "bigint",
+        "symbol": "text",
+        "decision_id": "bigint",
+        "action_taken": "text",
+        "reason": "text",
+        "market_price": "numeric",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/paper/run-paper-trading-worker.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "paper_trading_accounts",
+        "decision_id": "final_market_decisions"
+      },
+      "defaults": {
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "paper_trades",
+      "columns": {
+        "id": "bigint",
+        "entry_final_score": "numeric",
+        "entry_confidence": "numeric",
+        "entry_direction": "text",
+        "entry_action": "text",
+        "entry_trading_permission": "text",
+        "entry_decision_snapshot": "jsonb",
+        "close_decision_id": "bigint",
+        "close_final_score": "numeric",
+        "close_confidence": "numeric",
+        "close_direction": "text",
+        "close_action": "text",
+        "close_trading_permission": "text",
+        "close_decision_snapshot": "jsonb",
+        "holding_seconds": "numeric",
+        "mfe_percent": "numeric",
+        "mae_percent": "numeric",
+        "account_id": "bigint",
+        "position_id": "bigint",
+        "symbol": "text",
+        "side": "text",
+        "entry_price": "numeric",
+        "exit_price": "numeric",
+        "quantity": "numeric",
+        "gross_pnl": "numeric",
+        "fees": "numeric",
+        "net_pnl": "numeric",
+        "return_percent": "numeric",
+        "close_reason": "text",
+        "opened_at": "timestamptz",
+        "closed_at": "timestamptz",
+        "created_at": "timestamptz",
+        "strategy_config_id": "bigint"
+      },
+      "evidence": [
+        "market-worker/src/paper/run-paper-trading-worker.ts",
+        "marketmind-ai/dashboard/types.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "position_id"
+        ]
+      ],
+      "foreignKeys": {
+        "account_id": "paper_trading_accounts",
+        "strategy_config_id": "paper_strategy_configs",
+        "position_id": "paper_positions",
+        "close_decision_id": "final_market_decisions"
+      },
+      "defaults": {
+        "mfe_percent": "0",
+        "mae_percent": "0",
+        "opened_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "paper_trading_accounts",
+      "columns": {
+        "id": "bigint",
+        "name": "text",
+        "base_currency": "text",
+        "initial_balance": "numeric",
+        "cash_balance": "numeric",
+        "realized_pnl": "numeric",
+        "total_fees": "numeric",
+        "is_active": "boolean",
+        "created_at": "timestamptz",
+        "updated_at": "timestamptz"
+      },
+      "evidence": [
+        "marketmind-ai/dashboard/types.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "realized_pnl": "0",
+        "total_fees": "0",
+        "is_active": "true",
+        "created_at": "now()",
+        "updated_at": "now()"
+      },
+      "notNull": [
+        "created_at",
+        "initial_balance",
+        "cash_balance"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "performance_battle_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "linked_pairs": "numeric",
+        "candidate_v2_snapshots": "numeric",
+        "excluded_lagged_pairs": "numeric",
+        "verdict": "text",
+        "verdict_reason": "text",
+        "overall_metrics": "jsonb",
+        "regime_metrics": "jsonb",
+        "v2_diagnostics": "jsonb",
+        "methodology": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/performance-battle/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "phase7_pipeline_audit_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "status": "text",
+        "healthy_stages": "numeric",
+        "warning_stages": "numeric",
+        "critical_stages": "numeric",
+        "stages": "jsonb",
+        "reasons": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/phase7-audit/run-phase7-pipeline-audit.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "position_cluster_levels",
+      "columns": {
+        "id": "bigint",
+        "map_id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "price_low": "numeric",
+        "price_high": "numeric",
+        "center_price": "numeric",
+        "distance_from_current_percent": "numeric",
+        "long_intensity": "numeric",
+        "short_intensity": "numeric",
+        "dominant_side": "text",
+        "confidence": "numeric",
+        "estimated_new_long_oi_usd": "numeric",
+        "estimated_new_short_oi_usd": "numeric",
+        "exchange_count": "numeric",
+        "contributing_exchanges": "jsonb",
+        "sample_count": "numeric",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/position-cluster/run-position-cluster.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "map_id": "position_cluster_maps"
+      },
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "map_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "position_cluster_maps",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "lookback_hours": "numeric",
+        "half_life_hours": "numeric",
+        "current_price": "numeric",
+        "bin_size_usd": "numeric",
+        "total_estimated_new_long_oi_usd": "numeric",
+        "total_estimated_new_short_oi_usd": "numeric",
+        "strongest_long_cluster": "jsonb",
+        "strongest_short_cluster": "jsonb",
+        "source_exchange_count": "numeric",
+        "source_snapshot_count": "numeric",
+        "clusters": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/position-cluster/run-position-cluster.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "shadow_signal_validation_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "window_hours": "numeric",
+        "calibration_ratio": "numeric",
+        "return_threshold_percent": "numeric",
+        "news_validation": "jsonb",
+        "funding_validation": "jsonb",
+        "overall_verdict": "text",
+        "recommendations": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/shadow-validation/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "signal_calibration_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "calculated_at": "timestamptz",
+        "window_hours": "numeric",
+        "mode": "text",
+        "news_candidate": "jsonb",
+        "funding_candidate": "jsonb",
+        "recommendations": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/calibration/repository.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "squeeze_early_warning_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "current_price": "numeric",
+        "long_phase": "text",
+        "short_phase": "text",
+        "long_alert_score": "numeric",
+        "short_alert_score": "numeric",
+        "dominant_warning": "text",
+        "long_warning": "jsonb",
+        "short_warning": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/squeeze-warning/run-squeeze-early-warning.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "squeeze_opportunity_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "current_price": "numeric",
+        "preferred_direction": "text",
+        "permission": "text",
+        "long_status": "text",
+        "short_status": "text",
+        "long_score": "numeric",
+        "short_score": "numeric",
+        "long_trigger_price": "numeric",
+        "short_trigger_price": "numeric",
+        "long_target_price_1": "numeric",
+        "long_target_price_2": "numeric",
+        "long_extended_target_price": "numeric",
+        "short_target_price_1": "numeric",
+        "short_target_price_2": "numeric",
+        "short_extended_target_price": "numeric",
+        "long_opportunity": "jsonb",
+        "short_opportunity": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/squeeze-opportunity/run-squeeze-opportunity.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "squeeze_probability_snapshots",
+      "columns": {
+        "id": "bigint",
+        "symbol": "text",
+        "bucket_time": "timestamptz",
+        "calculated_at": "timestamptz",
+        "current_price": "numeric",
+        "long_squeeze_probability": "numeric",
+        "long_squeeze_level": "text",
+        "short_squeeze_probability": "numeric",
+        "short_squeeze_level": "text",
+        "dominant_risk": "text",
+        "long_squeeze": "jsonb",
+        "short_squeeze": "jsonb",
+        "strategy_version": "text",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/squeeze/run-squeeze-probability.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "symbol",
+          "bucket_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "calculated_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "bucket_time",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "strategy_candidate_comparisons",
+      "columns": {
+        "id": "bigint",
+        "comparison_run_id": "uuid",
+        "candidate_key": "text",
+        "candidate_name": "text",
+        "candidate_kind": "text",
+        "symbol": "text",
+        "long_score_min": "numeric",
+        "short_score_max": "numeric",
+        "confidence_min": "numeric",
+        "position_size_percent": "numeric",
+        "fee_rate_percent": "numeric",
+        "slippage_percent": "numeric",
+        "source_observation_count": "numeric",
+        "source_last_backtest_id": "bigint",
+        "selected_trades": "numeric",
+        "skipped_observations": "numeric",
+        "selection_rate": "numeric",
+        "winning_trades": "numeric",
+        "losing_trades": "numeric",
+        "win_rate": "numeric",
+        "expected_return_percent": "numeric",
+        "cumulative_return_percent": "numeric",
+        "profit_factor": "numeric",
+        "max_drawdown_percent": "numeric",
+        "sample_status": "text",
+        "optimization_eligible": "boolean",
+        "analyzed_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/optimization/run-strategy-candidate-comparison.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "optimization_eligible": "false",
+        "analyzed_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "strategy_optimization_status",
+      "columns": {
+        "id": "bigint",
+        "overall_status": "text",
+        "progress_percent": "numeric",
+        "safe_for_automatic_application": "boolean",
+        "summary": "text",
+        "checks": "jsonb",
+        "strategy_count": "numeric",
+        "max_trade_count": "numeric",
+        "eligible_candidate_count": "numeric",
+        "validated_candidate_count": "numeric",
+        "recommendation_id": "bigint",
+        "checked_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/optimization/run-optimization-readiness.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "recommendation_id": "strategy_recommendations"
+      },
+      "defaults": {
+        "safe_for_automatic_application": "false",
+        "checked_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "strategy_performance_snapshots",
+      "columns": {
+        "id": "bigint",
+        "strategy_config_id": "bigint",
+        "account_id": "bigint",
+        "symbol": "text",
+        "strategy_version": "text",
+        "long_score_min": "numeric",
+        "short_score_max": "numeric",
+        "confidence_min": "numeric",
+        "position_size_percent": "numeric",
+        "stop_loss_percent": "numeric",
+        "take_profit_percent": "numeric",
+        "max_holding_minutes": "numeric",
+        "total_trades": "numeric",
+        "winning_trades": "numeric",
+        "losing_trades": "numeric",
+        "breakeven_trades": "numeric",
+        "win_rate": "numeric",
+        "gross_profit": "numeric",
+        "gross_loss": "numeric",
+        "net_pnl": "numeric",
+        "average_pnl": "numeric",
+        "average_return_percent": "numeric",
+        "average_win": "numeric",
+        "average_loss": "numeric",
+        "payoff_ratio": "numeric",
+        "profit_factor": "numeric",
+        "max_drawdown": "numeric",
+        "max_drawdown_percent": "numeric",
+        "consecutive_wins_max": "numeric",
+        "consecutive_losses_max": "numeric",
+        "average_holding_seconds": "numeric",
+        "min_holding_seconds": "numeric",
+        "max_holding_seconds": "numeric",
+        "side_performance": "jsonb",
+        "confidence_performance": "jsonb",
+        "exit_reason_performance": "jsonb",
+        "excursion_metrics": "jsonb",
+        "sample_status": "text",
+        "optimization_eligible": "boolean",
+        "trades_until_provisional": "numeric",
+        "trades_until_ready": "numeric",
+        "first_trade_at": "timestamptz",
+        "last_trade_at": "timestamptz",
+        "last_trade_id": "bigint",
+        "analyzed_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/optimization/run-strategy-performance-analyzer.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "account_id": "paper_trading_accounts",
+        "strategy_config_id": "paper_strategy_configs",
+        "last_trade_id": "paper_trades"
+      },
+      "defaults": {
+        "optimization_eligible": "false",
+        "analyzed_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at",
+        "account_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "strategy_recommendations",
+      "columns": {
+        "id": "bigint",
+        "source_validation_run_id": "uuid",
+        "recommendation_status": "text",
+        "selected_candidate_key": "text",
+        "selected_candidate_name": "text",
+        "selected_candidate_kind": "text",
+        "recommendation_score": "numeric",
+        "recommendation_confidence": "numeric",
+        "recommendation_reason": "text",
+        "eligible_candidate_count": "numeric",
+        "selected_long_score_min": "numeric",
+        "selected_short_score_max": "numeric",
+        "selected_confidence_min": "numeric",
+        "selected_position_size_percent": "numeric",
+        "candidate_rankings": "jsonb",
+        "requires_manual_approval": "boolean",
+        "applied_at": "timestamptz",
+        "recommended_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/optimization/run-strategy-recommendation.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "requires_manual_approval": "true",
+        "recommended_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "strategy_validation_results",
+      "columns": {
+        "id": "bigint",
+        "validation_run_id": "uuid",
+        "candidate_key": "text",
+        "candidate_name": "text",
+        "candidate_kind": "text",
+        "symbol": "text",
+        "training_ratio": "numeric",
+        "source_observation_count": "numeric",
+        "source_last_backtest_id": "bigint",
+        "split_at": "timestamptz",
+        "training_observations": "numeric",
+        "validation_observations": "numeric",
+        "training_trades": "numeric",
+        "validation_trades": "numeric",
+        "training_expected_return": "numeric",
+        "validation_expected_return": "numeric",
+        "training_profit_factor": "numeric",
+        "validation_profit_factor": "numeric",
+        "training_max_drawdown": "numeric",
+        "validation_max_drawdown": "numeric",
+        "return_retention_ratio": "numeric",
+        "profit_factor_retention_ratio": "numeric",
+        "robustness_status": "text",
+        "validation_eligible": "boolean",
+        "validation_reason": "text",
+        "analyzed_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/optimization/run-strategy-walk-forward-validation.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "validation_eligible": "false",
+        "analyzed_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "symbol",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "technical_snapshots",
+      "columns": {
+        "id": "bigint",
+        "exchange": "text",
+        "market_type": "text",
+        "symbol": "text",
+        "timeframe": "text",
+        "candle_open_time": "timestamptz",
+        "analyzed_at": "timestamptz",
+        "close_price": "numeric",
+        "ema_20": "numeric",
+        "ema_60": "numeric",
+        "ema_120": "numeric",
+        "ema_240": "numeric",
+        "rsi_14": "numeric",
+        "macd": "numeric",
+        "macd_signal": "numeric",
+        "macd_histogram": "numeric",
+        "atr_14": "numeric",
+        "adx_14": "numeric",
+        "bollinger_upper": "numeric",
+        "bollinger_middle": "numeric",
+        "bollinger_lower": "numeric",
+        "bollinger_width": "numeric",
+        "volume_ma_20": "numeric",
+        "volume_ratio": "numeric",
+        "obv": "numeric",
+        "mfi_14": "numeric",
+        "market_structure": "text",
+        "trend_direction": "text",
+        "momentum_direction": "text",
+        "volatility_state": "text",
+        "indicator_data": "jsonb"
+      },
+      "evidence": [
+        "market-worker/src/analyzers/btc-technical.ts"
+      ],
+      "origin": "existing-branch-ddl",
+      "unique": [
+        [
+          "exchange",
+          "market_type",
+          "symbol",
+          "timeframe",
+          "candle_open_time"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "indicator_data": "'{}'::jsonb"
+      },
+      "notNull": [
+        "id",
+        "exchange",
+        "market_type",
+        "symbol",
+        "timeframe",
+        "candle_open_time",
+        "analyzed_at",
+        "close_price",
+        "indicator_data"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "worker_execution_locks",
+      "columns": {
+        "worker_name": "text",
+        "run_id": "uuid",
+        "acquired_at": "timestamptz",
+        "locked_until": "timestamptz",
+        "heartbeat_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/scripts/check-worker-lock.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {},
+      "defaults": {
+        "acquired_at": "now()",
+        "heartbeat_at": "now()"
+      },
+      "notNull": [],
+      "primaryKey": [
+        "worker_name"
+      ]
+    },
+    {
+      "name": "worker_execution_runs",
+      "columns": {
+        "id": "bigint",
+        "run_id": "uuid",
+        "worker_name": "text",
+        "status": "text",
+        "trigger_source": "text",
+        "process_id": "bigint",
+        "finished_at": "timestamptz",
+        "duration_ms": "numeric",
+        "error_message": "text",
+        "started_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/operations/WorkerExecutionTracker.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [
+        [
+          "run_id"
+        ]
+      ],
+      "foreignKeys": {},
+      "defaults": {
+        "started_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "run_id",
+        "created_at"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    },
+    {
+      "name": "worker_execution_stages",
+      "columns": {
+        "id": "bigint",
+        "execution_run_id": "bigint",
+        "stage_key": "text",
+        "stage_label": "text",
+        "status": "text",
+        "finished_at": "timestamptz",
+        "duration_ms": "numeric",
+        "error_message": "text",
+        "started_at": "timestamptz",
+        "created_at": "timestamptz"
+      },
+      "evidence": [
+        "market-worker/src/operations/WorkerExecutionTracker.ts"
+      ],
+      "origin": "reconstructed-from-callers",
+      "unique": [],
+      "foreignKeys": {
+        "execution_run_id": "worker_execution_runs"
+      },
+      "defaults": {
+        "started_at": "now()",
+        "created_at": "now()"
+      },
+      "notNull": [
+        "created_at",
+        "execution_run_id"
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "identity": "by-default"
+    }
+  ],
+  "views": [
+    "latest_strategy_performance",
+    "latest_strategy_candidate_comparisons",
+    "latest_strategy_validation_results",
+    "latest_strategy_recommendation",
+    "latest_strategy_optimization_status",
+    "paper_strategy_comparison_v1"
+  ],
+  "rpcs": [
+    "acquire_worker_lock_v2",
+    "heartbeat_worker_lock_v2",
+    "release_worker_lock_v2",
+    "mark_stale_worker_runs_v1",
+    "paper_open_position_v1",
+    "paper_close_position_v1",
+    "adaptive_paper_open_position_v1",
+    "adaptive_paper_close_position_v1"
+  ]
+}

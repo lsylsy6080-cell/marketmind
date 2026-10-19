@@ -1,4 +1,4 @@
-import { createAdminClient } from "../lib/supabase/admin";
+import { createAdminClient } from "../lib/database/admin";
 import type {
   CandidateComparisonData,
   CandidateComparisonRow,
@@ -25,8 +25,8 @@ const numericKeys = [
 
 export async function getCandidateComparisonData(): Promise<CandidateComparisonData> {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const database = createAdminClient();
+    const { data, error } = await database
       .from("latest_strategy_candidate_comparisons")
       .select("*");
 

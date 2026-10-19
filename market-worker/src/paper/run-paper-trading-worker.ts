@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   calculatePositionReturnPercent,
   calculateUnrealizedPnl,
@@ -188,7 +188,7 @@ async function trackPositionExcursion(params: {
     next.maePercent !== mapExcursion(params.positionRow).maePercent;
 
   if (changed) {
-    const { error } = await supabase
+    const { error } = await database
       .from("paper_positions")
       .update({
         mfe_percent: round(next.mfePercent, 6),
@@ -238,7 +238,7 @@ async function fetchBinancePrice(symbol: string): Promise<number> {
 }
 
 async function getActiveConfigs(): Promise<StrategyConfigRow[]> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("paper_strategy_configs")
     .select(`
       id,
@@ -262,7 +262,7 @@ async function getActiveConfigs(): Promise<StrategyConfigRow[]> {
 }
 
 async function getAccount(accountId: number): Promise<PaperAccountRow> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("paper_trading_accounts")
     .select("id, cash_balance")
     .eq("id", accountId)
@@ -279,7 +279,7 @@ async function getAccount(accountId: number): Promise<PaperAccountRow> {
 async function getLatestDecision(
   symbol: string,
 ): Promise<FinalDecisionRow | null> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("final_market_decisions")
     .select(`
       id,
@@ -307,7 +307,7 @@ async function getOpenPosition(
   accountId: number,
   symbol: string,
 ): Promise<OpenPositionRow | null> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("paper_positions")
     .select(`
       id,
@@ -362,7 +362,7 @@ async function attachEntryDecisionMetadata(params: {
 }): Promise<void> {
   const snapshot = buildDecisionSnapshot(params.decision);
 
-  const { error } = await supabase
+  const { error } = await database
     .from("paper_positions")
     .update({
       entry_final_score: snapshot.finalScore,
@@ -392,7 +392,7 @@ async function attachTradeAuditMetadata(params: {
     ? buildDecisionSnapshot(params.closeDecision)
     : null;
 
-  const { error } = await supabase
+  const { error } = await database
     .from("paper_trades")
     .update({
       entry_final_score:
@@ -450,7 +450,7 @@ async function insertStrategyRun(params: {
     const cutoff = new Date(
       Date.now() - PASSIVE_RUN_LOG_INTERVAL_MINUTES * 60_000,
     ).toISOString();
-    const { data: recent, error: recentError } = await supabase
+    const { data: recent, error: recentError } = await database
       .from("paper_strategy_runs")
       .select("id")
       .eq("account_id", params.accountId)
@@ -467,7 +467,7 @@ async function insertStrategyRun(params: {
     if (recent) return;
   }
 
-  const { error } = await supabase.from("paper_strategy_runs").insert({
+  const { error } = await database.from("paper_strategy_runs").insert({
     account_id: params.accountId,
     symbol: params.symbol,
     decision_id: params.decisionId,
@@ -497,7 +497,7 @@ async function insertEquitySnapshot(params: {
     reservedNotional = position.entryPrice * position.quantity;
   }
 
-  const { error } = await supabase.from("paper_equity_snapshots").insert({
+  const { error } = await database.from("paper_equity_snapshots").insert({
     account_id: params.account.id,
     symbol: params.symbol,
     cash_balance: round(cashBalance),
@@ -633,7 +633,7 @@ async function processOpenPosition(params: {
   }
 
   const rpcCloseReason = toRpcCloseReason(closeReason);
-  const { data, error } = await supabase.rpc("paper_close_position_v1", {
+  const { data, error } = await database.rpc("paper_close_position_v1", {
     p_position_id: params.positionRow.id,
     p_market_price: params.marketPrice,
     p_close_reason: rpcCloseReason,
@@ -692,7 +692,7 @@ async function processNewEntry(params: {
     return "skipped";
   }
 
-  const { data, error } = await supabase.rpc("paper_open_position_v1", {
+  const { data, error } = await database.rpc("paper_open_position_v1", {
     p_account_id: params.row.account_id,
     p_config_id: params.row.id,
     p_decision_id: params.decisionRow.id,

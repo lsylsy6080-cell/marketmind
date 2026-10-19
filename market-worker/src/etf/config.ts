@@ -1,14 +1,4 @@
-function required(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`환경변수 ${name}가 없습니다.`);
-  return value;
-}
-
 export const config = {
-  // Supabase
-  supabaseUrl: required("SUPABASE_URL"),
-  supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
-
   // Farside
   farsideUrl:
     process.env.FARSIDE_ETF_URL?.trim() ||

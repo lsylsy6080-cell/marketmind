@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { ExchangeFuturesSnapshot,FuturesExchange,GlobalFuturesSnapshot } from "./types";
 import {normalizeBinanceTrades,normalizeBybitTrades,normalizeGateTrades,normalizeMexcTrades,normalizeOkxTrades} from "./TakerFlowNormalizer";
 
@@ -139,7 +139,7 @@ export async function collectGlobalFuturesSnapshot():Promise<GlobalFuturesSnapsh
   };
   const bucket=new Date(Math.floor(Date.now()/60_000)*60_000).toISOString();
   for(const x of exchanges){
-    const {error}=await supabase.from("global_futures_exchange_snapshots").upsert({
+    const {error}=await database.from("global_futures_exchange_snapshots").upsert({
       bucket_time:bucket,fetched_at:x.fetchedAt,exchange:x.exchange,symbol:x.symbol,last_price:x.lastPrice,mark_price:x.markPrice,
       volume_24h_base:x.volume24hBase,turnover_24h_usd:x.turnover24hUsd,open_interest_base:x.openInterestBase,
       open_interest_usd:x.openInterestUsd,funding_rate:x.fundingRate,taker_buy_usd:x.takerBuyUsd,taker_sell_usd:x.takerSellUsd,
@@ -147,7 +147,7 @@ export async function collectGlobalFuturesSnapshot():Promise<GlobalFuturesSnapsh
     },{onConflict:"exchange,bucket_time"});
     if(error)throw new Error(`[Global Futures] ${x.exchange} save failed: ${error.message}`);
   }
-  const {error}=await supabase.from("global_futures_snapshots").upsert({
+  const {error}=await database.from("global_futures_snapshots").upsert({
     bucket_time:bucket,fetched_at:result.fetchedAt,symbol:result.symbol,exchange_count:5,healthy_exchange_count:healthy.length,
     total_turnover_24h_usd:result.totalTurnover24hUsd,total_open_interest_usd:result.totalOpenInterestUsd,
     weighted_funding_rate:result.weightedFundingRate,global_taker_buy_ratio:result.globalTakerBuyRatio,

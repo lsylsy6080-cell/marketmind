@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   evaluateOptimizationReadiness,
   type OptimizationReadinessInput,
@@ -17,10 +17,10 @@ export async function runOptimizationReadiness(): Promise<void> {
 
   const [performanceResult, candidatesResult, validationResult, recommendationResult] =
     await Promise.all([
-      supabase.from("latest_strategy_performance").select("total_trades, sample_status"),
-      supabase.from("latest_strategy_candidate_comparisons").select("selected_trades, optimization_eligible"),
-      supabase.from("latest_strategy_validation_results").select("robustness_status"),
-      supabase.from("latest_strategy_recommendation").select(
+      database.from("latest_strategy_performance").select("total_trades, sample_status"),
+      database.from("latest_strategy_candidate_comparisons").select("selected_trades, optimization_eligible"),
+      database.from("latest_strategy_validation_results").select("robustness_status"),
+      database.from("latest_strategy_recommendation").select(
         "id, recommendation_status, selected_candidate_name, requires_manual_approval",
       ).maybeSingle(),
     ]);
@@ -85,7 +85,7 @@ export async function runOptimizationReadiness(): Promise<void> {
   };
   const status = evaluateOptimizationReadiness(input);
 
-  const { data: latest, error: latestError } = await supabase
+  const { data: latest, error: latestError } = await database
     .from("strategy_optimization_status")
     .select("overall_status, progress_percent, recommendation_id")
     .order("checked_at", { ascending: false })
@@ -105,7 +105,7 @@ export async function runOptimizationReadiness(): Promise<void> {
     return;
   }
 
-  const { error } = await supabase.from("strategy_optimization_status").insert({
+  const { error } = await database.from("strategy_optimization_status").insert({
     overall_status: status.overallStatus,
     progress_percent: status.progressPercent,
     safe_for_automatic_application: false,

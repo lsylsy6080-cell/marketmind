@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { calculateSqueezeEarlyWarning } from "./SqueezeEarlyWarningEngine";
 import type { SqueezeHistoryPoint } from "./SqueezeEarlyWarningEngine";
 import type { SqueezeWarningPhase } from "./types";
@@ -43,20 +43,20 @@ export async function runSqueezeEarlyWarning() {
     { data: liquidation, error: liquidationError },
     { data: previousWarning, error: warningError },
   ] = await Promise.all([
-    supabase
+    database
       .from("squeeze_probability_snapshots")
       .select("calculated_at,long_squeeze_probability,short_squeeze_probability,long_squeeze,short_squeeze")
       .eq("symbol", "BTCUSDT")
       .order("calculated_at", { ascending: false })
       .limit(10),
-    supabase
+    database
       .from("btc_liquidation_snapshots")
       .select("state,confidence,bucket_time")
       .eq("symbol", "BTCUSDT")
       .order("bucket_time", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
+    database
       .from("squeeze_early_warning_snapshots")
       .select("long_phase,short_phase,calculated_at")
       .eq("symbol", "BTCUSDT")
@@ -100,7 +100,7 @@ export async function runSqueezeEarlyWarning() {
     .map((row: any) => historyPoint(row, "short"))
     .filter((x): x is SqueezeHistoryPoint => x != null);
 
-  const currentPriceResult = await supabase
+  const currentPriceResult = await database
     .from("squeeze_probability_snapshots")
     .select("current_price")
     .eq("symbol", "BTCUSDT")
@@ -141,7 +141,7 @@ export async function runSqueezeEarlyWarning() {
   });
 
   const bucket = new Date(Math.floor(Date.now() / 60_000) * 60_000).toISOString();
-  const { error: saveError } = await supabase
+  const { error: saveError } = await database
     .from("squeeze_early_warning_snapshots")
     .upsert({
       symbol: "BTCUSDT",

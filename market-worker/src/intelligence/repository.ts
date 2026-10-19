@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type {
   ComponentName,
   MarketComponent,
@@ -80,21 +80,21 @@ export async function loadLatestMarketComponents(
   now = new Date(),
 ): Promise<MarketComponent[]> {
   const [fundingResult, newsResult, etfResult] = await Promise.all([
-    supabase
+    database
       .from("funding_snapshots")
       .select("id, fetched_at, score, confidence, direction, risk_level, trading_permission, score_details")
       .eq("symbol", "BTCUSDT")
       .order("fetched_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
+    database
       .from("news_scores")
       .select("id, calculated_at, weighted_score, confidence, direction, risk_level, article_count, score_details")
       .eq("symbol", "BTCUSDT")
       .order("calculated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
+    database
       .from("etf_scores")
       .select("id, flow_date, score, confidence, direction, daily_flow_usd, flow_3d_usd, flow_5d_usd, flow_20d_usd, positive_streak, negative_streak, score_details")
       .eq("asset", "BTC")
@@ -246,7 +246,7 @@ export async function saveMarketIntelligence(
     strategy_version: result.strategyVersion,
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("market_intelligence_scores")
     .insert(payload)
     .select("id")

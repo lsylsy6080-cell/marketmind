@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import type { MarketRegimeResult } from "../regime/types";
 import type { DecisionV2Component, DecisionV2Result } from "./types";
 
@@ -24,41 +24,41 @@ const asNumber = (value: unknown, field: string): number => {
 
 export async function loadDecisionV2Sources(): Promise<SourceBundle> {
   const [technicalResult, newsResult, fundingResult, regimeResult, v1Result, calibrationResult, previousPlanResult, candles15mResult, candles1hResult, openInterestResult, liquidationResult, squeezeWarningResult] = await Promise.all([
-    supabase.from("market_scores")
+    database.from("market_scores")
       .select("id,analyzed_at,total_score,confidence,direction,risk_level,trading_permission,score_details")
       .eq("symbol", "BTCUSDT").order("analyzed_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("news_scores")
+    database.from("news_scores")
       .select("id,calculated_at,weighted_score,confidence,direction,risk_level,conflict_score,score_details")
       .eq("symbol", "BTCUSDT").order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("funding_snapshots")
+    database.from("funding_snapshots")
       .select("id,fetched_at,score,confidence,direction,risk_level,trading_permission,score_details")
       .eq("symbol", "BTCUSDT").order("fetched_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("market_regime_snapshots")
+    database.from("market_regime_snapshots")
       .select("id,bucket_time,calculated_at,regime,direction_bias,confidence,trend_score,alignment_score,weighted_adx,high_volatility_weight,risk_level,timeframe_details,reasons,strategy_version")
       .eq("symbol", "BTCUSDT").eq("strategy_version", "market-regime-v2.0")
       .order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("final_market_decisions")
+    database.from("final_market_decisions")
       .select("id").eq("symbol", "BTCUSDT").order("decided_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("signal_calibration_snapshots")
+    database.from("signal_calibration_snapshots")
       .select("calculated_at,news_candidate,funding_candidate,strategy_version").eq("symbol", "BTCUSDT")
       .eq("strategy_version", "signal-calibration-v2.3a3").order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("ai_decision_v2_snapshots")
+    database.from("ai_decision_v2_snapshots")
       .select("calculated_at,entry_plan,entry_trigger,strategy_version").eq("symbol", "BTCUSDT")
       .in("strategy_version", ["decision-engine-v2.5-entry-timing", "decision-engine-v2.5.1-entry-trigger-validator", "decision-engine-v2.6-open-interest", "decision-engine-v2.7-liquidation", "decision-engine-v2.8-squeeze-aware"])
       .not("entry_plan", "is", null).order("calculated_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("market_candles")
+    database.from("market_candles")
       .select("open_time,high,low").eq("exchange","binance").eq("market_type","spot").eq("symbol","BTCUSDT")
       .eq("timeframe","15m").eq("is_closed",true).order("open_time",{ascending:false}).limit(20),
-    supabase.from("market_candles")
+    database.from("market_candles")
       .select("open_time,high,low").eq("exchange","binance").eq("market_type","spot").eq("symbol","BTCUSDT")
       .eq("timeframe","1h").eq("is_closed",true).order("open_time",{ascending:false}).limit(20),
-    supabase.from("btc_open_interest_snapshots")
+    database.from("btc_open_interest_snapshots")
       .select("id,fetched_at,flow_state,directional_bias,confidence,oi_change_5m_percent,oi_change_15m_percent,oi_change_1h_percent,price_change_5m_percent,price_change_15m_percent,price_change_1h_percent,entry_adjustment,overheat_adjustment,reversal_adjustment,reasons")
       .eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
-    supabase.from("btc_liquidation_snapshots")
+    database.from("btc_liquidation_snapshots")
       .select("id,ended_at,state,directional_bias,confidence,long_liquidation_usd,short_liquidation_usd,total_liquidation_usd,burst_multiple,dominance_ratio,stream_healthy,entry_adjustment,overheat_adjustment,reversal_adjustment,reasons")
       .eq("symbol","BTCUSDT").order("bucket_time",{ascending:false}).limit(1).maybeSingle(),
-    supabase.from("squeeze_early_warning_snapshots")
+    database.from("squeeze_early_warning_snapshots")
       .select("id,calculated_at,long_phase,short_phase,long_alert_score,short_alert_score,dominant_warning,long_warning,short_warning")
       .eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
   ]);
@@ -265,7 +265,7 @@ export async function saveDecisionV2(result: DecisionV2Result, source: SourceBun
     strategy_version: result.strategyVersion,
   };
 
-  const { error } = await supabase.from("ai_decision_v2_snapshots").upsert(payload, {
+  const { error } = await database.from("ai_decision_v2_snapshots").upsert(payload, {
     onConflict: "technical_score_id,news_score_id,funding_score_id,regime_snapshot_id,strategy_version",
     ignoreDuplicates: false,
   });

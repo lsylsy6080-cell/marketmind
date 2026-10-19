@@ -1,4 +1,4 @@
-import { createAdminClient } from "../lib/supabase/admin";
+import { createAdminClient } from "../lib/database/admin";
 import type {
   AiDecisionV2Snapshot,
   BacktestSummary,
@@ -266,29 +266,29 @@ function mapStrategyPerformance(row: Record<string, unknown>): StrategyPerforman
 
 export async function getHomePaperTradingData(): Promise<PaperTradingData> {
   try {
-    const supabase = createAdminClient();
+    const database = createAdminClient();
     const [accountResult, decisionsResult, fundingResult, decisionV2Result] = await Promise.all([
-      supabase
+      database
         .from("paper_trading_accounts")
         .select("*")
         .eq("is_active", true)
         .order("id")
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("final_market_decisions")
         .select("*")
         .eq("symbol", "BTCUSDT")
         .order("decided_at", { ascending: false })
         .limit(3),
-      supabase
+      database
         .from("funding_snapshots")
         .select("*")
         .eq("symbol", "BTCUSDT")
-        .order("analyzed_at", { ascending: false })
+        .order("fetched_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("ai_decision_v2_snapshots")
         .select("id,symbol,calculated_at,direction_score,market_trend_strength,direction_strength,final_score,final_confidence,direction,action,entry_quality_score,entry_quality,overheat_risk,reversal_risk,data_reliability,risk_level,trading_permission,preferred_entry,entry_plan,entry_trigger,strategy_version")
         .eq("symbol", "BTCUSDT")
@@ -332,7 +332,7 @@ export async function getHomePaperTradingData(): Promise<PaperTradingData> {
     }
 
     const accountId = Number(accountResult.data.id);
-    const positionsResult = await supabase
+    const positionsResult = await database
       .from("paper_positions")
       .select("*")
       .eq("account_id", accountId)
@@ -372,30 +372,30 @@ export async function getHomePaperTradingData(): Promise<PaperTradingData> {
 
 export async function getPaperTradingData(): Promise<PaperTradingData> {
   try {
-    const supabase = createAdminClient();
+    const database = createAdminClient();
 
     const [accountResult, decisionsResult, fundingResult, decisionV2Result] = await Promise.all([
-      supabase
+      database
         .from("paper_trading_accounts")
         .select("*")
         .eq("is_active", true)
         .order("id")
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("final_market_decisions")
         .select("*")
         .eq("symbol", "BTCUSDT")
         .order("decided_at", { ascending: false })
         .limit(8),
-      supabase
+      database
         .from("funding_snapshots")
         .select("*")
         .eq("symbol", "BTCUSDT")
-        .order("analyzed_at", { ascending: false })
+        .order("fetched_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("ai_decision_v2_snapshots")
         .select("id,symbol,calculated_at,direction_score,market_trend_strength,direction_strength,final_score,final_confidence,direction,action,entry_quality_score,entry_quality,overheat_risk,reversal_risk,data_reliability,risk_level,trading_permission,preferred_entry,entry_plan,entry_trigger,strategy_version")
         .eq("symbol", "BTCUSDT")
@@ -447,7 +447,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
     const accountId = Number(accountResult.data.id);
 
     const [configResult, positionsResult, tradesResult, equityResult] = await Promise.all([
-      supabase
+      database
         .from("paper_strategy_configs")
         .select("*")
         .eq("account_id", accountId)
@@ -455,20 +455,20 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
         .order("id", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("paper_positions")
         .select("*")
         .eq("account_id", accountId)
         .eq("status", "open")
         .order("opened_at", { ascending: false })
         .limit(5),
-      supabase
+      database
         .from("paper_trades")
         .select("*")
         .eq("account_id", accountId)
         .order("closed_at", { ascending: false })
         .limit(120),
-      supabase
+      database
         .from("paper_equity_snapshots")
         .select("*")
         .eq("account_id", accountId)
@@ -519,7 +519,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
     const referencedId = openPositions[0]?.opening_decision_id ?? null;
 
     if (referencedId && !decisionsById[referencedId]) {
-      const referenced = await supabase
+      const referenced = await database
         .from("final_market_decisions")
         .select("*")
         .eq("id", referencedId)
@@ -534,7 +534,7 @@ export async function getPaperTradingData(): Promise<PaperTradingData> {
     let strategyPerformance: StrategyPerformanceSnapshot | null = null;
     const activeConfigId = config?.id ?? null;
     if (activeConfigId !== null) {
-      const performanceResult = await supabase
+      const performanceResult = await database
         .from("strategy_performance_snapshots")
         .select("*")
         .eq("strategy_config_id", activeConfigId)

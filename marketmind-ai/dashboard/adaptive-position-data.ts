@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "../lib/database/admin";
 
 export type AdaptivePositionPlanData = {
   status: "open" | "ready" | "watch" | "unavailable";
@@ -35,24 +35,7 @@ const n = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-function getSupabase() {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SECRET_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL 및 SUPABASE_SECRET_KEY가 필요합니다.",
-    );
-  }
-
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+function getDatabase() { return createAdminClient(); }
 
 export async function getAdaptivePositionPlanData(): Promise<AdaptivePositionPlanData> {
   const empty: AdaptivePositionPlanData = {
@@ -86,24 +69,24 @@ export async function getAdaptivePositionPlanData(): Promise<AdaptivePositionPla
   };
 
   try {
-    const supabase = getSupabase();
+    const database = getDatabase();
 
     const [decisionRes, sizingRes, positionRes, equityRes] = await Promise.all([
-      supabase
+      database
         .from("ai_decision_v2_snapshots")
         .select("id,calculated_at,direction,entry_plan,entry_trigger")
         .eq("symbol", "BTCUSDT")
         .order("calculated_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("adaptive_position_sizing_snapshots")
         .select("id,calculated_at,decision_v2_id,sizing_status,risk_tier,sizing_score,margin_percent,leverage,margin_amount,notional_amount,apply_mode")
         .eq("symbol", "BTCUSDT")
         .order("calculated_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("adaptive_paper_positions")
         .select("id,side,entry_price,stop_loss_price,take_profit_price,margin_percent,requested_leverage,leverage,leverage_adjusted,margin_amount,notional_amount,estimated_liquidation_price,liquidation_distance_percent,liquidation_safety_buffer_percent,liquidation_safety_status,opened_at")
         .eq("symbol", "BTCUSDT")
@@ -111,7 +94,7 @@ export async function getAdaptivePositionPlanData(): Promise<AdaptivePositionPla
         .order("opened_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
+      database
         .from("adaptive_paper_equity_snapshots")
         .select("equity,unrealized_pnl,market_price,created_at")
         .eq("symbol", "BTCUSDT")

@@ -1,4 +1,4 @@
-import { createAdminClient } from "../lib/supabase/admin";
+import { createAdminClient } from "../lib/database/admin";
 import type { StrategyComparisonData, StrategyComparisonRow } from "./types";
 
 const numericKeys = [
@@ -12,8 +12,8 @@ const numericKeys = [
 
 export async function getStrategyComparisonData(): Promise<StrategyComparisonData> {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const database = createAdminClient();
+    const { data, error } = await database
       .from("paper_strategy_comparison_v1")
       .select("*")
       .order("sort_order", { ascending: true });

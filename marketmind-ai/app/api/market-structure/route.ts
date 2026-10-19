@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +25,8 @@ function normalizeLevel(value:unknown){
 export async function GET(){
  const checkedAt=new Date().toISOString();
  try{
-  const supabase=createAdminClient();
-  const {data,error}=await supabase.from("market_structure_snapshots").select("calculated_at,current_price,support_levels,resistance_levels,strategy_version").eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle();
+  const database=createAdminClient();
+  const {data,error}=await database.from("market_structure_snapshots").select("calculated_at,current_price,support_levels,resistance_levels,strategy_version").eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle();
   if(error)throw new Error(error.message);
   if(!data)return NextResponse.json({ok:false,checkedAt,current:null},{headers:{"Cache-Control":"no-store, max-age=0"}});
   return NextResponse.json({ok:true,checkedAt,current:{calculatedAt:data.calculated_at,currentPrice:num(data.current_price),supportLevels:list(data.support_levels).map(normalizeLevel),resistanceLevels:list(data.resistance_levels).map(normalizeLevel),strategyVersion:data.strategy_version}},{headers:{"Cache-Control":"no-store, max-age=0"}});

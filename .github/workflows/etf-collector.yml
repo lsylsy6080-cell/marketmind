@@ -18,36 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    defaults:
-      run:
-        working-directory: market-worker
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: market-worker/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ETF collector
-        run: npm run etf:collect
+      - name: Run ETF collection on Buddy4 through the authenticated HTTPS job API
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
-
-          COINGLASS_API_KEY_HEADER: ${{ vars.COINGLASS_API_KEY_HEADER }}
-          COINGLASS_BASE_URL: ${{ vars.COINGLASS_BASE_URL }}
-          COINGLASS_ETF_PATH: ${{ vars.COINGLASS_ETF_PATH }}
-
-          ETF_ASSET: BTC
-          ETF_MARKET: US
-          ETF_SOURCE: coinglass
-          ETF_DRY_RUN: "false"
+          BUDDY4_JOB_URL: ${{ secrets.BUDDY4_JOB_URL }}
+          BUDDY4_JOB_TOKEN: ${{ secrets.BUDDY4_JOB_TOKEN }}
+        run: |
+          test -n "$BUDDY4_JOB_URL" && test -n "$BUDDY4_JOB_TOKEN"
+          case "$BUDDY4_JOB_URL" in https://*) ;; *) echo "HTTPS endpoint required"; exit 1;; esac
+          curl --fail-with-body --silent --show-error --max-time 300 \
+            -H "Authorization: Bearer $BUDDY4_JOB_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data '{}' "$BUDDY4_JOB_URL"

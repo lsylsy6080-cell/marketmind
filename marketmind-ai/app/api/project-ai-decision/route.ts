@@ -1,5 +1,5 @@
 import type { AiDecisionAlignment, AiDecisionFactor, AiDecisionPermission, AiDecisionRisk, AiDecisionSignal, AiDecisionSnapshot, AiDecisionTrend, AiFactorState } from "@/components/project-center/AiDecisionMonitorCard";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -68,12 +68,12 @@ function normalize(rowValue: unknown, index: number): AiDecisionSnapshot {
 export async function GET() {
   const checkedAt = new Date().toISOString();
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.from("final_market_decisions").select("*").order("created_at", { ascending: false }).limit(MAX_HISTORY);
+    const database = createAdminClient();
+    const { data, error } = await database.from("final_market_decisions").select("*").order("created_at", { ascending: false }).limit(MAX_HISTORY);
     if (error) throw new Error(error.message);
     const history = (data ?? []).map(normalize);
-    return NextResponse.json({ ok: history.length > 0, checkedAt, source: "Supabase · final_market_decisions", current: history[0] ?? null, history }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    return NextResponse.json({ ok: history.length > 0, checkedAt, source: "Buddy4 PostgreSQL · final_market_decisions", current: history[0] ?? null, history }, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
-    return NextResponse.json({ ok: false, checkedAt, source: "Supabase · final_market_decisions", current: null, history: [], error: error instanceof Error ? error.message : "AI 판단 데이터를 불러오지 못했습니다." }, { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } });
+    return NextResponse.json({ ok: false, checkedAt, source: "Buddy4 PostgreSQL · final_market_decisions", current: null, history: [], error: error instanceof Error ? error.message : "AI 판단 데이터를 불러오지 못했습니다." }, { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } });
   }
 }

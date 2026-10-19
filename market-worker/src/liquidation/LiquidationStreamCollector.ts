@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { classifyLiquidationWindow } from "./LiquidationIntelligenceEngine";
 import type { LiquidationMinuteSnapshot } from "./types";
 
@@ -34,7 +34,7 @@ function newBuffer(now=Date.now()):BufferState{
 
 async function recentMedianTotalUsd():Promise<number|null>{
   const since=new Date(Date.now()-60*60_000).toISOString();
-  const {data,error}=await supabase.from("btc_liquidation_snapshots")
+  const {data,error}=await database.from("btc_liquidation_snapshots")
     .select("total_liquidation_usd").eq("symbol",SYMBOL)
     .gte("bucket_time",since).order("bucket_time",{ascending:false}).limit(60);
   if(error) throw new Error(`[Liquidation] median 조회 실패: ${error.message}`);
@@ -68,7 +68,7 @@ async function saveWindow(buffer:BufferState,streamHealthy:boolean):Promise<Liqu
     strategyVersion:"liquidation-intelligence-v7.10",
   };
 
-  const {error}=await supabase.from("btc_liquidation_snapshots").upsert({
+  const {error}=await database.from("btc_liquidation_snapshots").upsert({
     symbol:snapshot.symbol,bucket_time:snapshot.bucketTime,
     started_at:snapshot.startedAt,ended_at:snapshot.endedAt,
     event_count:snapshot.eventCount,long_liquidation_usd:snapshot.longLiquidationUsd,
@@ -189,7 +189,7 @@ export class LiquidationStreamCollector{
 }
 
 export async function getLatestLiquidationSnapshot(){
-  const {data,error}=await supabase.from("btc_liquidation_snapshots")
+  const {data,error}=await database.from("btc_liquidation_snapshots")
     .select("*").eq("symbol",SYMBOL).order("bucket_time",{ascending:false}).limit(1).maybeSingle();
   if(error)throw new Error(`[Liquidation] latest 조회 실패: ${error.message}`);
   return data;

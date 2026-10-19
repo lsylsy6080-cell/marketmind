@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { evaluateContextExecutionOutcome } from "./ContextExecutionOutcome";
 import type { GuardPermission, Phase87OutcomeResult } from "./types";
 
@@ -9,7 +9,7 @@ type RunResult =
   | {status:"waiting"; reason:string};
 
 async function loadCandleAtOrAfter(at:string):Promise<{openTime:string;close:number}|null>{
-  const {data,error}=await supabase.from("market_candles")
+  const {data,error}=await database.from("market_candles")
     .select("open_time,close")
     .eq("exchange","binance").eq("market_type","spot").eq("symbol","BTCUSDT")
     .eq("timeframe","1m").eq("is_closed",true)
@@ -23,7 +23,7 @@ async function loadCandleAtOrAfter(at:string):Promise<{openTime:string;close:num
 
 export async function runPhase87ContextOutcome():Promise<RunResult>{
   const maturedBefore=new Date(Date.now()-HORIZON_MINUTES*60_000).toISOString();
-  const {data:guards,error}=await supabase.from("context_execution_guard_snapshots")
+  const {data:guards,error}=await database.from("context_execution_guard_snapshots")
     .select("id,calculated_at,side,permission,margin_multiplier")
     .eq("symbol","BTCUSDT").lte("calculated_at",maturedBefore)
     .order("calculated_at",{ascending:false}).limit(20);
@@ -31,7 +31,7 @@ export async function runPhase87ContextOutcome():Promise<RunResult>{
   if(!guards?.length) return {status:"waiting",reason:"15분 이상 경과한 Guard 없음"};
 
   for(const row of guards as any[]){
-    const {data:existing,error:existingError}=await supabase.from("context_execution_outcome_snapshots")
+    const {data:existing,error:existingError}=await database.from("context_execution_outcome_snapshots")
       .select("id").eq("guard_snapshot_id",Number(row.id)).limit(1).maybeSingle();
     if(existingError) throw new Error(`[8-7] 중복 확인 실패: ${existingError.message}`);
     if(existing) continue;
@@ -50,7 +50,7 @@ export async function runPhase87ContextOutcome():Promise<RunResult>{
       horizonMinutes:HORIZON_MINUTES,
     });
 
-    const {error:saveError}=await supabase.from("context_execution_outcome_snapshots").insert({
+    const {error:saveError}=await database.from("context_execution_outcome_snapshots").insert({
       symbol:"BTCUSDT",
       calculated_at:new Date().toISOString(),
       guard_snapshot_id:Number(row.id),

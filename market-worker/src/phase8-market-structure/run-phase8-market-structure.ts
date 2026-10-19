@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { buildVolumeProfile } from "./VolumeProfileEngine";
 import { buildSupportResistance, detectSwings } from "./SupportResistanceEngine";
 import type { CandleRow, MarketType, Phase81Result, ProfileWindow, StructureTimeframe } from "./types";
@@ -6,7 +6,7 @@ const PROFILE_CONFIG:{window:ProfileWindow;timeframe:string;limit:number}[]=[{wi
 const STRUCTURE_CONFIG:{timeframe:StructureTimeframe;limit:number}[]=[{timeframe:"15m",limit:300},{timeframe:"1h",limit:300},{timeframe:"4h",limit:250},{timeframe:"1d",limit:180}];
 function num(v:unknown){const n=Number(v);if(!Number.isFinite(n))throw new Error(`숫자 변환 실패: ${String(v)}`);return n}
 async function load(marketType:MarketType,timeframe:string,limit:number):Promise<CandleRow[]>{
- const {data,error}=await supabase.from("market_candles").select("open_time,open,high,low,close,volume,quote_volume").eq("exchange","binance").eq("market_type",marketType).eq("symbol","BTCUSDT").eq("timeframe",timeframe).eq("is_closed",true).order("open_time",{ascending:false}).limit(limit);
+ const {data,error}=await database.from("market_candles").select("open_time,open,high,low,close,volume,quote_volume").eq("exchange","binance").eq("market_type",marketType).eq("symbol","BTCUSDT").eq("timeframe",timeframe).eq("is_closed",true).order("open_time",{ascending:false}).limit(limit);
  if(error)throw new Error(`[8-1] ${marketType}/${timeframe} 조회 실패: ${error.message}`);
  return [...(data??[])].reverse().map((r:any)=>({openTime:r.open_time,open:num(r.open),high:num(r.high),low:num(r.low),close:num(r.close),volume:num(r.volume),quoteVolume:num(r.quote_volume)}));
 }
@@ -22,7 +22,7 @@ export async function runPhase81MarketStructure():Promise<Phase81Result>{
  const calculatedAt=new Date().toISOString(), mem=process.memoryUsage();
  const result:Phase81Result={symbol:"BTCUSDT",calculatedAt,currentPrice,profiles,...sr,performance:{loadMs,profileMs,structureMs,saveMs:0,totalMs:0,rssMb:Number((mem.rss/1048576).toFixed(1)),heapMb:Number((mem.heapUsed/1048576).toFixed(1))},strategyVersion:"phase8-market-structure-v8.1.1"};
  const saveStart=Date.now();
- const {error}=await supabase.from("market_structure_snapshots").insert({symbol:result.symbol,calculated_at:result.calculatedAt,current_price:result.currentPrice,profiles:result.profiles,nearest_support:result.nearestSupport,next_support:result.nextSupport,nearest_resistance:result.nearestResistance,next_resistance:result.nextResistance,support_levels:result.supportLevels,resistance_levels:result.resistanceLevels,performance:result.performance,strategy_version:result.strategyVersion});
+ const {error}=await database.from("market_structure_snapshots").insert({symbol:result.symbol,calculated_at:result.calculatedAt,current_price:result.currentPrice,profiles:result.profiles,nearest_support:result.nearestSupport,next_support:result.nextSupport,nearest_resistance:result.nearestResistance,next_resistance:result.nextResistance,support_levels:result.supportLevels,resistance_levels:result.resistanceLevels,performance:result.performance,strategy_version:result.strategyVersion});
  if(error)throw new Error(`[8-1] snapshot 저장 실패: ${error.message}`);
  result.performance.saveMs=Date.now()-saveStart; result.performance.totalMs=Date.now()-totalStart;
  return result;

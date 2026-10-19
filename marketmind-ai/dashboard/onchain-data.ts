@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient } from '@/lib/database/admin';
 export interface OnchainMetric { value: number | null; unit: string; source: string; observed_at: string }
 export interface OnchainSource { ok: boolean; fetched_at: string; error: string | null; metric_count: number }
 export interface OnchainSnapshot {

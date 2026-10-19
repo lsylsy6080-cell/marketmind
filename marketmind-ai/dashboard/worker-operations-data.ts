@@ -1,10 +1,10 @@
-import { createAdminClient } from "../lib/supabase/admin";
+import { createAdminClient } from "../lib/database/admin";
 import type { WorkerOperationsData, WorkerRun, WorkerStage } from "./types";
 
 export async function getWorkerOperationsData(): Promise<WorkerOperationsData> {
   try {
-    const supabase = createAdminClient();
-    const { data: runs, error } = await supabase
+    const database = createAdminClient();
+    const { data: runs, error } = await database
       .from("worker_execution_runs")
       .select("*")
       .order("started_at", { ascending: false })
@@ -13,7 +13,7 @@ export async function getWorkerOperationsData(): Promise<WorkerOperationsData> {
 
     const latestRunId = runs?.[0]?.id;
     const stagesResult = latestRunId
-      ? await supabase
+      ? await database
           .from("worker_execution_stages")
           .select("*")
           .eq("execution_run_id", latestRunId)

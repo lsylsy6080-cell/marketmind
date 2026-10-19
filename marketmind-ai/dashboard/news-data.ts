@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@/lib/database/admin";
 
 export type NewsDirection = "bullish" | "neutral" | "bearish";
 
@@ -87,9 +87,9 @@ export async function getNewsArticlesPage(params?: {
   const offset = Math.max(0, params?.offset ?? 0);
   const limit = Math.min(50, Math.max(1, params?.limit ?? NEWS_PAGE_SIZE));
   const sentiment = params?.sentiment ?? "all";
-  const supabase = createAdminClient();
+  const database = createAdminClient();
 
-  let query = supabase
+  let query = database
     .from("news_articles")
     .select("id,source,title,summary,article_url,published_at,sentiment,importance,ai_score,ai_summary,analysis_status,localized_title,localized_summary,translation_status,relevance_score,impact_level,is_duplicate")
     .eq("asset", "BTC")
@@ -112,9 +112,9 @@ export async function getNewsArticlesPage(params?: {
 
 export async function getNewsPageData(): Promise<NewsPageData> {
   try {
-    const supabase = createAdminClient();
+    const database = createAdminClient();
     const [scoreResult, page] = await Promise.all([
-      supabase
+      database
         .from("news_scores")
         .select("*")
         .eq("symbol", "BTCUSDT")

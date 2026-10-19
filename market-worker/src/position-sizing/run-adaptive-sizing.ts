@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { calculateAdaptivePositionSizing } from "./AdaptivePositionSizingEngine";
 import type { AdaptiveSizingPlan } from "./types";
 
@@ -13,12 +13,12 @@ const num=(v:unknown,fallback=0)=>{const n=Number(v);return Number.isFinite(n)?n
 
 export async function runAdaptiveSizing(options?:{dryRun?:boolean}):Promise<AdaptiveSizingPlan>{
   const [v2Result, accountResult] = await Promise.all([
-    supabase.from("ai_decision_v2_snapshots")
+    database.from("ai_decision_v2_snapshots")
       .select("id,calculated_at,direction,direction_strength,entry_quality_score,overheat_risk,reversal_risk,data_reliability,trading_permission,funding_crowding_risk,entry_plan,entry_trigger,regime_snapshot_id,strategy_version")
       .eq("symbol","BTCUSDT")
       .eq("strategy_version","decision-engine-v2.5.1-entry-trigger-validator")
       .order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
-    supabase.from("paper_trading_accounts")
+    database.from("paper_trading_accounts")
       .select("id,cash_balance,is_active")
       .eq("is_active",true).order("id",{ascending:true}).limit(1).maybeSingle(),
   ]);
@@ -30,7 +30,7 @@ export async function runAdaptiveSizing(options?:{dryRun?:boolean}):Promise<Adap
   const v2=v2Result.data as LatestV2Row;
   let regimeConfidence=0;
   if(v2.regime_snapshot_id){
-    const {data,error}=await supabase.from("market_regime_snapshots")
+    const {data,error}=await database.from("market_regime_snapshots")
       .select("confidence").eq("id",v2.regime_snapshot_id).maybeSingle();
     if(error) throw new Error(`[Sizing] Regime 조회 실패: ${error.message}`);
     regimeConfidence=num(data?.confidence,0);
@@ -57,7 +57,7 @@ export async function runAdaptiveSizing(options?:{dryRun?:boolean}):Promise<Adap
   });
 
   if(!options?.dryRun){
-    const {error}=await supabase.from("adaptive_position_sizing_snapshots").upsert({
+    const {error}=await database.from("adaptive_position_sizing_snapshots").upsert({
       symbol:"BTCUSDT",
       calculated_at:new Date().toISOString(),
       decision_v2_id:v2.id,

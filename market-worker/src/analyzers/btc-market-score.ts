@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import {
   calculateTechnicalMarketScore,
   type TechnicalSnapshotInput,
@@ -86,7 +86,7 @@ function mapSnapshot(
 export async function generateBtcMarketScore(): Promise<void> {
   console.log("[시장점수] 최신 기술지표 조회 시작");
 
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("technical_snapshots")
     .select(
       [
@@ -168,7 +168,7 @@ export async function generateBtcMarketScore(): Promise<void> {
   });
 
   const { data: existing, error: existingError } =
-    await supabase
+    await database
       .from("market_scores")
       .select("id")
       .eq("symbol", "BTCUSDT")
@@ -183,7 +183,7 @@ export async function generateBtcMarketScore(): Promise<void> {
   }
 
   if (existing) {
-    const { error: updateError } = await supabase
+    const { error: updateError } = await database
       .from("market_scores")
       .update(scoreRow)
       .eq("id", existing.id);
@@ -200,7 +200,7 @@ export async function generateBtcMarketScore(): Promise<void> {
     return;
   }
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await database
     .from("market_scores")
     .insert(scoreRow);
 

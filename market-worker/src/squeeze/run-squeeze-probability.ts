@@ -1,13 +1,13 @@
 import "dotenv/config";
-import {supabase} from "../lib/supabase";
+import {database} from "../lib/database";
 import {calculateSqueezeProbability} from "./SqueezeProbabilityEngine";
 const n=(v:unknown):number|null=>{const x=Number(v);return Number.isFinite(x)?x:null};
 export async function runSqueezeProbability(){
  const [{data:liqMap,error:lmErr},{data:oi,error:oiErr},{data:liq,error:liqErr},{data:gf,error:gfErr}]=await Promise.all([
-  supabase.from("estimated_liquidation_maps").select("current_price,long_zones,short_zones,calculated_at").eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
-  supabase.from("btc_open_interest_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
-  supabase.from("btc_liquidation_snapshots").select("*").eq("symbol","BTCUSDT").order("bucket_time",{ascending:false}).limit(1).maybeSingle(),
-  supabase.from("global_futures_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
+  database.from("estimated_liquidation_maps").select("current_price,long_zones,short_zones,calculated_at").eq("symbol","BTCUSDT").order("calculated_at",{ascending:false}).limit(1).maybeSingle(),
+  database.from("btc_open_interest_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
+  database.from("btc_liquidation_snapshots").select("*").eq("symbol","BTCUSDT").order("bucket_time",{ascending:false}).limit(1).maybeSingle(),
+  database.from("global_futures_snapshots").select("*").eq("symbol","BTCUSDT").order("fetched_at",{ascending:false}).limit(1).maybeSingle(),
  ]);
  if(lmErr)throw new Error(`[Squeeze] liquidation map 조회 실패: ${lmErr.message}`);
  if(!liqMap)return{status:"warming_up",reason:"Estimated Liquidation Map이 아직 없습니다.",result:null};
@@ -34,7 +34,7 @@ export async function runSqueezeProbability(){
   dataReliability:Math.min(100,60+takerCoverage*.4),
  });
  const bucket=new Date(Math.floor(Date.now()/60000)*60000).toISOString();
- const {error:saveError}=await supabase.from("squeeze_probability_snapshots").upsert({
+ const {error:saveError}=await database.from("squeeze_probability_snapshots").upsert({
   symbol:"BTCUSDT",bucket_time:bucket,calculated_at:result.calculatedAt,current_price:result.currentPrice,
   long_squeeze_probability:result.longSqueeze.probability,long_squeeze_level:result.longSqueeze.level,
   short_squeeze_probability:result.shortSqueeze.probability,short_squeeze_level:result.shortSqueeze.level,

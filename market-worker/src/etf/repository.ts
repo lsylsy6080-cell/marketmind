@@ -1,13 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
-import { config } from "./config";
+import { database } from "../lib/database";
 import type { EtfFlowRecord } from "./types";
 
-const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
 export async function saveEtfRecord(record: EtfFlowRecord): Promise<number> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("etf_flow_snapshots")
     .upsert(
       {
@@ -30,7 +25,7 @@ export async function saveEtfRecord(record: EtfFlowRecord): Promise<number> {
 
   const snapshotId = Number(data.id);
   if (record.details.length) {
-    const { error: detailError } = await supabase
+    const { error: detailError } = await database
       .from("etf_flow_details")
       .upsert(
         record.details.map((item) => ({
@@ -50,7 +45,7 @@ export async function saveEtfRecord(record: EtfFlowRecord): Promise<number> {
 export async function saveEtfScore(
   score: Record<string, unknown>,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await database
     .from("etf_scores")
     .upsert(score, {
       onConflict: "asset,flow_date",

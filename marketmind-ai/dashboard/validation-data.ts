@@ -1,4 +1,4 @@
-import { createAdminClient } from "../lib/supabase/admin";
+import { createAdminClient } from "../lib/database/admin";
 import type { StrategyValidationData, StrategyValidationRow } from "./types";
 
 const numericKeys = [
@@ -21,8 +21,8 @@ const numericKeys = [
 
 export async function getStrategyValidationData(): Promise<StrategyValidationData> {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
+    const database = createAdminClient();
+    const { data, error } = await database
       .from("latest_strategy_validation_results")
       .select("*");
 

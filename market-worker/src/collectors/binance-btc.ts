@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 
 const BINANCE_KLINE_URL =
   "https://data-api.binance.vision/api/v3/klines";
@@ -97,7 +97,7 @@ async function saveCandles(
     return 0;
   }
 
-  const { error } = await supabase
+  const { error } = await database
     .from("market_candles")
     .upsert(rows, {
       onConflict:
@@ -106,7 +106,7 @@ async function saveCandles(
     });
 
   if (error) {
-    throw new Error(`Supabase 저장 실패: ${error.message}`);
+    throw new Error(`Buddy4 PostgreSQL 저장 실패: ${error.message}`);
   }
 
   return rows.length;

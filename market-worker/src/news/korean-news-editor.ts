@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { impactLevel } from "./news-pipeline-utils";
 import { createBitcoinFlash } from "./news-flash-editor";
 import { buildFlashMismatchReport, formatFlashMismatchReport, type FlashMismatchDiagnostic } from "./news-flash-diagnostics";
@@ -11,7 +11,7 @@ interface PendingRow {
 
 export async function editPendingNewsToKorean(limit=30):Promise<{completed:number;failed:number;skipped:number}>{
   const batchLimit=Math.max(1,Math.min(100,Number(process.env.NEWS_FLASH_BATCH_SIZE ?? limit)||30));
-  const {data,error}=await supabase.from("news_articles")
+  const {data,error}=await database.from("news_articles")
     .select("id,source,title,summary,ai_summary,sentiment,importance,relevance_score,published_at,raw_data")
     .eq("asset","BTC").eq("analysis_status","completed")
     .in("translation_status",["pending","failed","reprocess"])
@@ -24,7 +24,7 @@ export async function editPendingNewsToKorean(limit=30):Promise<{completed:numbe
     try{
       const flash=createBitcoinFlash(row.title,row.ai_summary??row.summary);
       const relevance=Number(row.relevance_score??0), importance=Number(row.importance??5);
-      const {error:updateError}=await supabase.from("news_articles").update({
+      const {error:updateError}=await database.from("news_articles").update({
         localized_title:flash.headline,
         localized_summary:flash.summary,
         translation_status:"completed",

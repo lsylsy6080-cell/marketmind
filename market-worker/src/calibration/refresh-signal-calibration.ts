@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { database } from "../lib/database";
 import { buildSignalCalibration } from "./SignalCalibrationEngine";
 import { loadCalibrationRows, saveCalibrationSnapshot } from "./repository";
 
@@ -6,7 +6,7 @@ const REFRESH_INTERVAL_MINUTES = 60;
 const WINDOW_HOURS = 168;
 
 export async function refreshSignalCalibrationIfStale(): Promise<{ refreshed: boolean; calculatedAt: string | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await database
     .from("signal_calibration_snapshots")
     .select("calculated_at")
     .eq("symbol", "BTCUSDT")
